@@ -19,42 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\capstone\arch\AArch64\AArch64BaseInfo.c" />
-    <ClCompile Include="..\capstone\arch\AArch64\AArch64Disassembler.c" />
-    <ClCompile Include="..\capstone\arch\AArch64\AArch64InstPrinter.c" />
-    <ClCompile Include="..\capstone\arch\AArch64\AArch64Mapping.c" />
-    <ClCompile Include="..\capstone\arch\AArch64\AArch64Module.c" />
-    <ClCompile Include="..\capstone\arch\ARM\ARMDisassembler.c" />
-    <ClCompile Include="..\capstone\arch\ARM\ARMInstPrinter.c" />
-    <ClCompile Include="..\capstone\arch\ARM\ARMMapping.c" />
-    <ClCompile Include="..\capstone\arch\ARM\ARMModule.c" />
-    <ClCompile Include="..\capstone\arch\Mips\MipsDisassembler.c" />
-    <ClCompile Include="..\capstone\arch\Mips\MipsInstPrinter.c" />
-    <ClCompile Include="..\capstone\arch\Mips\MipsMapping.c" />
-    <ClCompile Include="..\capstone\arch\Mips\MipsModule.c" />
-    <ClCompile Include="..\capstone\arch\PowerPC\PPCDisassembler.c" />
-    <ClCompile Include="..\capstone\arch\PowerPC\PPCInstPrinter.c" />
-    <ClCompile Include="..\capstone\arch\PowerPC\PPCMapping.c" />
-    <ClCompile Include="..\capstone\arch\PowerPC\PPCModule.c" />
-    <ClCompile Include="..\capstone\arch\Sparc\SparcDisassembler.c" />
-    <ClCompile Include="..\capstone\arch\Sparc\SparcInstPrinter.c" />
-    <ClCompile Include="..\capstone\arch\Sparc\SparcMapping.c" />
-    <ClCompile Include="..\capstone\arch\Sparc\SparcModule.c" />
-    <ClCompile Include="..\capstone\arch\SystemZ\SystemZDisassembler.c" />
-    <ClCompile Include="..\capstone\arch\SystemZ\SystemZInstPrinter.c" />
-    <ClCompile Include="..\capstone\arch\SystemZ\SystemZMapping.c" />
-    <ClCompile Include="..\capstone\arch\SystemZ\SystemZMCTargetDesc.c" />
-    <ClCompile Include="..\capstone\arch\SystemZ\SystemZModule.c" />
     <ClCompile Include="..\capstone\arch\X86\X86ATTInstPrinter.c" />
     <ClCompile Include="..\capstone\arch\X86\X86Disassembler.c" />
     <ClCompile Include="..\capstone\arch\X86\X86DisassemblerDecoder.c" />
     <ClCompile Include="..\capstone\arch\X86\X86IntelInstPrinter.c" />
     <ClCompile Include="..\capstone\arch\X86\X86Mapping.c" />
     <ClCompile Include="..\capstone\arch\X86\X86Module.c" />
-    <ClCompile Include="..\capstone\arch\XCore\XCoreInstPrinter.c" />
-    <ClCompile Include="..\capstone\arch\XCore\XCoreDisassembler.c" />
-    <ClCompile Include="..\capstone\arch\XCore\XCoreMapping.c" />
-    <ClCompile Include="..\capstone\arch\XCore\XCoreModule.c" />
     <ClCompile Include="..\capstone\cs.c" />
     <ClCompile Include="..\capstone\MCInst.c" />
     <ClCompile Include="..\capstone\MCInstrDesc.c" />
