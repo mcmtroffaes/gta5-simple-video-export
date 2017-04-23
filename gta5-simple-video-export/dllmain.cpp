@@ -51,7 +51,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 	switch (reason)
 	{
 	case DLL_PROCESS_ATTACH:
-		logger = spdlog::basic_logger_st(SCRIPT_NAME, SCRIPT_FOLDER);
+		logger = spdlog::basic_logger_st(SCRIPT_NAME, SCRIPT_FOLDER "\\log.txt");
 		sinkwriter_hook = getHookMFCreateSinkWriterFromURL();
 		break;
 	case DLL_PROCESS_DETACH:
