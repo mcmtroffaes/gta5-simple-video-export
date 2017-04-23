@@ -3,6 +3,12 @@
 #include <mfplay.h>
 #include <mfreadwrite.h>
 
+#define SCRIPT_NAME "simple-video-export"
+#define SCRIPT_FOLDER "SVE"
+
+std::shared_ptr<spdlog::logger> logger;
+std::shared_ptr<PLH::IATHook> sinkwriter_hook;
+
 #pragma comment(lib, "mfreadwrite.lib")
 
 typedef HRESULT(__stdcall *tMFCreateSinkWriterFromURL)(
@@ -20,12 +26,14 @@ HRESULT __stdcall SinkWriterNew(
 	IMFSinkWriter **ppSinkWriter
 )
 {
-	return sinkwriter_orig_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
+	logger->trace("SinkWriterNew: enter");
+	auto res = sinkwriter_orig_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
+	logger->trace("SinkWriterNew: exit");
+	return res;
 }
 
 std::shared_ptr<PLH::IATHook> getHookMFCreateSinkWriterFromURL()
 {
-	auto console = spdlog::stdout_color_mt("console");
 	std::shared_ptr<PLH::IATHook> hook(new PLH::IATHook);
 	hook->SetupHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", (BYTE*)&SinkWriterNew);
 	if (hook->Hook()) {
@@ -33,13 +41,23 @@ std::shared_ptr<PLH::IATHook> getHookMFCreateSinkWriterFromURL()
 		return hook;
 	}
 	else {
-		console->error("Failed to hook into MFCreateSinkWriterFromURL");
+		logger->error("Failed to hook into MFCreateSinkWriterFromURL");
 		return nullptr;
 	}
 }
 
-int main() {
-	std::shared_ptr<PLH::IATHook> sinkwriter_hook = getHookMFCreateSinkWriterFromURL();
-	getchar();
-	return 0;
+BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
+{
+	switch (reason)
+	{
+	case DLL_PROCESS_ATTACH:
+		logger = spdlog::basic_logger_st(SCRIPT_NAME, SCRIPT_FOLDER);
+		sinkwriter_hook = getHookMFCreateSinkWriterFromURL();
+		break;
+	case DLL_PROCESS_DETACH:
+		sinkwriter_hook->UnHook();
+		spdlog::drop(SCRIPT_NAME);
+		break;
+	}		
+	return TRUE;
 }
