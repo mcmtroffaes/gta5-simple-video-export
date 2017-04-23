@@ -75,21 +75,25 @@
     <LibraryPath>$(OutDir);$(LibraryPath)</LibraryPath>
     <IncludePath>..\spdlog\include;$(IncludePath)</IncludePath>
     <TargetExt>.asi</TargetExt>
+    <TargetName>SimpleVideoExport</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LibraryPath>$(OutDir);$(LibraryPath)</LibraryPath>
     <IncludePath>..\spdlog\include;$(IncludePath)</IncludePath>
     <TargetExt>.asi</TargetExt>
+    <TargetName>SimpleVideoExport</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LibraryPath>$(OutDir);$(LibraryPath)</LibraryPath>
     <IncludePath>..\spdlog\include;$(IncludePath)</IncludePath>
     <TargetExt>.asi</TargetExt>
+    <TargetName>SimpleVideoExport</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(OutDir);$(LibraryPath)</LibraryPath>
     <IncludePath>..\spdlog\include;$(IncludePath)</IncludePath>
     <TargetExt>.asi</TargetExt>
+    <TargetName>SimpleVideoExport</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
