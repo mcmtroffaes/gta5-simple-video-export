@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="MFCreateSinkWriterFromURL.cpp" />
+    <ClCompile Include="dllmain.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2D6CDF29-CC49-433A-BCB4-BAA073F076F8}</ProjectGuid>
