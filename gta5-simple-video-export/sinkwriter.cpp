@@ -32,7 +32,7 @@ HRESULT __stdcall SinkWriterFinalize(
 	) {
 	LOG_ENTER;
 	if (!finalize_hook) {
-		logger->error("hook not set up");
+		logger->error("IMFSinkWriter::Finalize hook not set up");
 		return E_FAIL;
 	}
 	auto original_func = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>();
@@ -54,7 +54,7 @@ HRESULT __stdcall CreateSinkWriterFromURL(
 {
 	LOG_ENTER;
 	if (!sinkwriter_hook) {
-		logger->error("hook not set up");
+		logger->error("MFCreateSinkWriterFromURL hook not set up");
 		return E_FAIL;
 	}
 	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
