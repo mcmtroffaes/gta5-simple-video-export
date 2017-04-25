@@ -46,7 +46,7 @@ STDAPI SinkWriterAddStream(
 	auto original_func = addstream_hook->GetOriginal<decltype(&SinkWriterAddStream)>();
 	logger->trace("IMFSinkWriter::AddStream: enter");
 	auto hr = original_func(pThis, pTargetMediaType, pdwStreamIndex);
-	logger->trace("IMFSinkWriter::AddStream: exit");
+	logger->trace("IMFSinkWriter::AddStream: exit {}", hr);
 	LOG_EXIT;
 	return hr;
 }
@@ -65,7 +65,7 @@ STDAPI SinkWriterSetInputMediaType(
 	auto original_func = setinputmediatype_hook->GetOriginal<decltype(&SinkWriterSetInputMediaType)>();
 	logger->trace("IMFSinkWriter::SetInputMediaType: enter");
 	auto hr = original_func(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
-	logger->trace("IMFSinkWriter::SetInputMediaType: exit");
+	logger->trace("IMFSinkWriter::SetInputMediaType: exit {}", hr);
 	LOG_EXIT;
 	return hr;
 }
@@ -83,7 +83,7 @@ STDAPI SinkWriterWriteSample(
 	auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
 	logger->trace("IMFSinkWriter::WriteSample: enter");
 	auto hr = original_func(pThis, dwStreamIndex, pSample);
-	logger->trace("IMFSinkWriter::WriteSample: exit");
+	logger->trace("IMFSinkWriter::WriteSample: exit {}", hr);
 	LOG_EXIT;
 	return hr;
 }
@@ -99,7 +99,7 @@ STDAPI SinkWriterFinalize(
 	auto original_func = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>();
 	logger->trace("IMFSinkWriter::Finalize: enter");
 	auto hr = original_func(pThis);
-	logger->trace("IMFSinkWriter::Finalize: exit");
+	logger->trace("IMFSinkWriter::Finalize: exit {}", hr);
 	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 	UnhookVFuncDetours();
 	LOG_EXIT;
@@ -121,7 +121,7 @@ STDAPI CreateSinkWriterFromURL(
 	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
 	logger->trace("MFCreateSinkWriterFromURL: enter");
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
-	logger->trace("MFCreateSinkWriterFromURL: exit");
+	logger->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	if (SUCCEEDED(hr)) {
 		addstream_hook = CreateVFuncDetour(*ppSinkWriter, 3, &SinkWriterAddStream);
 		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
