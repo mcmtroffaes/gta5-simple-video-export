@@ -20,11 +20,12 @@ HRESULT __stdcall SinkWriterFinalize(
 		logger->error("hook not set up");
 		return E_FAIL;
 	}
+	auto original_func = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>();
 	logger->trace("IMFSinkWriter::Finalize: enter");
-	auto hr = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>()(pThis);
+	auto hr = original_func(pThis);
 	logger->trace("IMFSinkWriter::Finalize: exit");
-	/* we will no longer use this IMFSinkWriter instance, so clean up all hooks */
-	Unhook();
+	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
+	UnhookVFuncDetours();
 	LOG_EXIT;
 	return hr;
 }
@@ -41,9 +42,10 @@ HRESULT __stdcall CreateSinkWriterFromURL(
 		logger->error("hook not set up");
 		return E_FAIL;
 	}
-	logger->trace("MFCreateSinkWriterFromURL: enter");
-	auto hr = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>()(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
-	logger->trace("MFCreateSinkWriterFromURL: exit");
+	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
+	logger->trace("MFCreateSinkWriterFromURL ({}): enter", original_func);
+	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
+	logger->trace("MFCreateSinkWriterFromURL ({}): exit", original_func);
 	if (SUCCEEDED(hr)) {
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}
@@ -51,10 +53,15 @@ HRESULT __stdcall CreateSinkWriterFromURL(
 	return hr;
 }
 
+void UnhookVFuncDetours()
+{
+	finalize_hook = nullptr;
+}
+
 void Hook()
 {
 	LOG_ENTER;
-	finalize_hook = nullptr; // hooked by CreateSinkWriterFromURL
+	UnhookVFuncDetours(); // these are hooked by CreateSinkWriterFromURL
 	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL);
 	LOG_EXIT;
 }
@@ -62,7 +69,7 @@ void Hook()
 void Unhook()
 {
 	LOG_ENTER;
-	finalize_hook = nullptr;
+	UnhookVFuncDetours();
 	sinkwriter_hook = nullptr;
 	LOG_EXIT;
 }
