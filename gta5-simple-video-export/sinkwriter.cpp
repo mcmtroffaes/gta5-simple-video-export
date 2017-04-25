@@ -12,6 +12,21 @@
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 
+void UnhookVFuncDetours()
+{
+	LOG_ENTER;
+	finalize_hook = nullptr;
+	LOG_EXIT;
+}
+
+void Unhook()
+{
+	LOG_ENTER;
+	UnhookVFuncDetours();
+	sinkwriter_hook = nullptr;
+	LOG_EXIT;
+}
+
 HRESULT __stdcall SinkWriterFinalize(
 	IMFSinkWriter *pThis
 	) {
@@ -21,9 +36,9 @@ HRESULT __stdcall SinkWriterFinalize(
 		return E_FAIL;
 	}
 	auto original_func = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>();
-	logger->trace("IMFSinkWriter::Finalize: enter");
+	logger->trace("IMFSinkWriter::Finalize ({:x}): enter", (void *)original_func);
 	auto hr = original_func(pThis);
-	logger->trace("IMFSinkWriter::Finalize: exit");
+	logger->trace("IMFSinkWriter::Finalize ({:x}): exit", (void *)original_func);
 	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 	UnhookVFuncDetours();
 	LOG_EXIT;
@@ -43,9 +58,9 @@ HRESULT __stdcall CreateSinkWriterFromURL(
 		return E_FAIL;
 	}
 	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
-	logger->trace("MFCreateSinkWriterFromURL ({}): enter", original_func);
+	logger->trace("MFCreateSinkWriterFromURL ({:x}): enter", (void *)original_func);
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
-	logger->trace("MFCreateSinkWriterFromURL ({}): exit", original_func);
+	logger->trace("MFCreateSinkWriterFromURL ({:x}): exit", (void *)original_func);
 	if (SUCCEEDED(hr)) {
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}
@@ -53,25 +68,10 @@ HRESULT __stdcall CreateSinkWriterFromURL(
 	return hr;
 }
 
-void UnhookVFuncDetours()
-{
-	LOG_ENTER;
-	finalize_hook = nullptr;
-	LOG_EXIT;
-}
-
 void Hook()
 {
 	LOG_ENTER;
 	UnhookVFuncDetours(); // these are hooked by CreateSinkWriterFromURL
 	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL);
-	LOG_EXIT;
-}
-
-void Unhook()
-{
-	LOG_ENTER;
-	UnhookVFuncDetours();
-	sinkwriter_hook = nullptr;
 	LOG_EXIT;
 }
