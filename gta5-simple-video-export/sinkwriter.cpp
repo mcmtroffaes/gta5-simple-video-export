@@ -36,9 +36,9 @@ STDAPI SinkWriterFinalize(
 		return E_FAIL;
 	}
 	auto original_func = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>();
-	logger->trace("IMFSinkWriter::Finalize ({:x}): enter", (void *)original_func);
+	logger->trace("IMFSinkWriter::Finalize: enter");
 	auto hr = original_func(pThis);
-	logger->trace("IMFSinkWriter::Finalize ({:x}): exit", (void *)original_func);
+	logger->trace("IMFSinkWriter::Finalize: exit");
 	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 	UnhookVFuncDetours();
 	LOG_EXIT;
@@ -58,9 +58,9 @@ STDAPI CreateSinkWriterFromURL(
 		return E_FAIL;
 	}
 	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
-	logger->trace("MFCreateSinkWriterFromURL ({:x}): enter", (void *)original_func);
+	logger->trace("MFCreateSinkWriterFromURL: enter");
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
-	logger->trace("MFCreateSinkWriterFromURL ({:x}): exit", (void *)original_func);
+	logger->trace("MFCreateSinkWriterFromURL: exit");
 	if (SUCCEEDED(hr)) {
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}

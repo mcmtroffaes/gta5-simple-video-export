@@ -14,6 +14,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		/* set up logger */
 		logger = spdlog::basic_logger_st(SCRIPT_NAME, SCRIPT_FOLDER "\\log.txt");
 		if (!logger) break;
+		logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
 		logger->set_level(spdlog::level::trace);
 		logger->flush_on(spdlog::level::trace);
 		LOG_ENTER;
