@@ -10,11 +10,17 @@
 #pragma comment(lib, "mfreadwrite.lib")
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
+std::unique_ptr<PLH::VFuncDetour> addstream_hook = nullptr;
+std::unique_ptr<PLH::VFuncDetour> setinputmediatype_hook = nullptr;
+std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 
 void UnhookVFuncDetours()
 {
 	LOG_ENTER;
+	addstream_hook = nullptr;
+	setinputmediatype_hook = nullptr;
+	writesample_hook = nullptr;
 	finalize_hook = nullptr;
 	LOG_EXIT;
 }
@@ -27,9 +33,64 @@ void Unhook()
 	LOG_EXIT;
 }
 
+STDAPI SinkWriterAddStream(
+	IMFSinkWriter *pThis,
+	IMFMediaType  *pTargetMediaType,
+	DWORD         *pdwStreamIndex)
+{
+	LOG_ENTER;
+	if (!addstream_hook) {
+		logger->error("IMFSinkWriter::AddStream hook not set up");
+		return E_FAIL;
+	}
+	auto original_func = addstream_hook->GetOriginal<decltype(&SinkWriterAddStream)>();
+	logger->trace("IMFSinkWriter::AddStream: enter");
+	auto hr = original_func(pThis, pTargetMediaType, pdwStreamIndex);
+	logger->trace("IMFSinkWriter::AddStream: exit");
+	LOG_EXIT;
+	return hr;
+}
+
+STDAPI SinkWriterSetInputMediaType(
+	IMFSinkWriter *pThis,
+	DWORD         dwStreamIndex,
+	IMFMediaType  *pInputMediaType,
+	IMFAttributes *pEncodingParameters)
+{
+	LOG_ENTER;
+	if (!setinputmediatype_hook) {
+		logger->error("IMFSinkWriter::SetInputMediaType hook not set up");
+		return E_FAIL;
+	}
+	auto original_func = setinputmediatype_hook->GetOriginal<decltype(&SinkWriterSetInputMediaType)>();
+	logger->trace("IMFSinkWriter::SetInputMediaType: enter");
+	auto hr = original_func(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
+	logger->trace("IMFSinkWriter::SetInputMediaType: exit");
+	LOG_EXIT;
+	return hr;
+}
+
+STDAPI SinkWriterWriteSample(
+	IMFSinkWriter *pThis,
+	DWORD         dwStreamIndex,
+	IMFSample     *pSample)
+{
+	LOG_ENTER;
+	if (!writesample_hook) {
+		logger->error("IMFSinkWriter::WriteSample hook not set up");
+		return E_FAIL;
+	}
+	auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
+	logger->trace("IMFSinkWriter::WriteSample: enter");
+	auto hr = original_func(pThis, dwStreamIndex, pSample);
+	logger->trace("IMFSinkWriter::WriteSample: exit");
+	LOG_EXIT;
+	return hr;
+}
+
 STDAPI SinkWriterFinalize(
-	IMFSinkWriter *pThis
-	) {
+	IMFSinkWriter *pThis)
+{
 	LOG_ENTER;
 	if (!finalize_hook) {
 		logger->error("IMFSinkWriter::Finalize hook not set up");
@@ -62,6 +123,9 @@ STDAPI CreateSinkWriterFromURL(
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
 	logger->trace("MFCreateSinkWriterFromURL: exit");
 	if (SUCCEEDED(hr)) {
+		addstream_hook = CreateVFuncDetour(*ppSinkWriter, 3, &SinkWriterAddStream);
+		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
+		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}
 	LOG_EXIT;
@@ -71,7 +135,7 @@ STDAPI CreateSinkWriterFromURL(
 void Hook()
 {
 	LOG_ENTER;
-	UnhookVFuncDetours(); // these are hooked by CreateSinkWriterFromURL
+	UnhookVFuncDetours(); // virtual functions are hooked by CreateSinkWriterFromURL
 	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL);
 	LOG_EXIT;
 }
