@@ -1,0 +1,11 @@
+// Create a sink writer. Allows us to get the IMFSinkWriter instance that is created for the video, and signals the start of the export.
+HRESULT MFCreateSinkWriterFromURL(LPCWSTR pwszOutputURL, IMFByteStream *pByteStream, IMFAttributes *pAttributes, IMFSinkWriter **ppSinkWriter);
+
+// Set the input media type. Allows us to know the format of the buffer of the WriteSample calls.
+HRESULT IMFSinkWriter::SetInputMediaType(DWORD dwStreamIndex, IMFMediaType  *pInputMediaType, IMFAttributes *pEncodingParameters);
+
+// Delivers a sample to the sink writer. Allows us to get the data.
+HRESULT IMFSinkWriter::WriteSample(DWORD dwStreamIndex, IMFSample *pSample);
+
+// Flags end of writing. Signals the end of the export.
+HRESULT IMFSinkWriter::Finalize();
