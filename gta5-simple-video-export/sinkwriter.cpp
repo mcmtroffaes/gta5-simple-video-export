@@ -55,7 +55,9 @@ HRESULT __stdcall CreateSinkWriterFromURL(
 
 void UnhookVFuncDetours()
 {
+	LOG_ENTER;
 	finalize_hook = nullptr;
+	LOG_EXIT;
 }
 
 void Hook()
