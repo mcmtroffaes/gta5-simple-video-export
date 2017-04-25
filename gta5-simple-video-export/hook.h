@@ -7,13 +7,11 @@ template <class FuncType>
 std::unique_ptr<PLH::IATHook> CreateIATHook(const char *library_name, const char *func_name, FuncType new_func) {
 	LOG_ENTER;
 	std::unique_ptr<PLH::IATHook> hook(new PLH::IATHook());
+	logger->debug("setting up hook for {}", func_name);
 	hook->SetupHook(library_name, func_name, (BYTE*)new_func);
-	if (hook->Hook()) {
-		logger->debug("hook set up for {}", func_name);
-	}
-	else {
+	if (!hook->Hook()) {
 		hook = nullptr;
-		logger->error("failed to set up hook for {} ({})", func_name, hook->GetLastError().GetString());
+		logger->error("failed to set up hook ({})", hook->GetLastError().GetString());
 	}
 	LOG_EXIT;
 	return hook;
