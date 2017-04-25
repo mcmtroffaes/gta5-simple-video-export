@@ -54,7 +54,7 @@ HRESULT __stdcall CreateSinkWriterFromURL(
 void Hook()
 {
 	LOG_ENTER;
-	finalize_hook = nullptr; // will be hooked when instance is created; see CreateSinkWriterFromURL
+	finalize_hook = nullptr; // hooked by CreateSinkWriterFromURL
 	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL);
 	LOG_EXIT;
 }

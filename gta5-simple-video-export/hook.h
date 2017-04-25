@@ -25,16 +25,16 @@ std::unique_ptr<PLH::VFuncDetour> CreateVFuncDetour(ClassType *p_instance, int v
 	std::unique_ptr<PLH::VFuncDetour> hook(new PLH::VFuncDetour());
 	if (!p_instance) {
 		hook = nullptr;
-		logger->error("failed to set up hook: pointer to class instance is nullptr");
+		logger->error("failed to set up hook for {} (nullptr to instance)", typeid(ClassType).name());
 	}
 	else {
 		hook->SetupHook(*(BYTE***)p_instance, vfunc_index, (BYTE*)new_func);
 		if (hook->Hook()) {
-			logger->debug("hook set up");
+			logger->debug("hook set up for {} at virtual function index {}", typeid(ClassType).name(), vfunc_index);
 		}
 		else {
 			hook = nullptr;
-			logger->error("failed to set up hook ({})", hook->GetLastError().GetString());
+			logger->error("failed to set up hook for {} ({})", typeid(ClassType).name(), hook->GetLastError().GetString());
 		}
 	}
 	LOG_EXIT;
