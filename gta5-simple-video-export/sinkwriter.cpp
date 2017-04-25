@@ -27,7 +27,7 @@ void Unhook()
 	LOG_EXIT;
 }
 
-HRESULT __stdcall SinkWriterFinalize(
+STDAPI SinkWriterFinalize(
 	IMFSinkWriter *pThis
 	) {
 	LOG_ENTER;
@@ -45,7 +45,7 @@ HRESULT __stdcall SinkWriterFinalize(
 	return hr;
 }
 
-HRESULT __stdcall CreateSinkWriterFromURL(
+STDAPI CreateSinkWriterFromURL(
 	LPCWSTR       pwszOutputURL,
 	IMFByteStream *pByteStream,
 	IMFAttributes *pAttributes,
