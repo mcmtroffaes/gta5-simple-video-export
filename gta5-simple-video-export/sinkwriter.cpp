@@ -12,26 +12,24 @@
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 
-HRESULT __stdcall FinalizeNew(
+HRESULT __stdcall SinkWriterFinalize(
 	IMFSinkWriter *pThis
 	) {
 	LOG_ENTER;
 	if (!finalize_hook) {
-		LOG_ERROR("finalize_hook not set up");
+		logger->error("hook not set up");
 		return E_FAIL;
 	}
 	logger->trace("IMFSinkWriter::Finalize: enter");
-	auto hr = finalize_hook->GetOriginal<decltype(&FinalizeNew)>()(pThis);
+	auto hr = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>()(pThis);
 	logger->trace("IMFSinkWriter::Finalize: exit");
-	/* we will no longer use this IMFSinkWriter instance, so clean up all hooks into it */
-	finalize_hook = nullptr;
-	sinkwriter_hook = nullptr;
-	logger->debug("cleared all IMFSinkWriter hooks");
+	/* we will no longer use this IMFSinkWriter instance, so clean up all hooks */
+	Unhook();
 	LOG_EXIT;
 	return hr;
 }
 
-HRESULT __stdcall SinkWriterNew(
+HRESULT __stdcall CreateSinkWriterFromURL(
 	LPCWSTR       pwszOutputURL,
 	IMFByteStream *pByteStream,
 	IMFAttributes *pAttributes,
@@ -40,15 +38,14 @@ HRESULT __stdcall SinkWriterNew(
 {
 	LOG_ENTER;
 	if (!sinkwriter_hook) {
-		LOG_ERROR("sinkwriter_orig_func not initialized; hook not set up?");
+		logger->error("hook not set up");
 		return E_FAIL;
 	}
 	logger->trace("MFCreateSinkWriterFromURL: enter");
-	auto hr = sinkwriter_hook->GetOriginal<decltype(&SinkWriterNew)>()(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
+	auto hr = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>()(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
 	logger->trace("MFCreateSinkWriterFromURL: exit");
 	if (SUCCEEDED(hr)) {
-		LOG_TRACE("hooking IMFSinkWriter::Finalize");
-		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &FinalizeNew);
+		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}
 	LOG_EXIT;
 	return hr;
@@ -57,15 +54,15 @@ HRESULT __stdcall SinkWriterNew(
 void Hook()
 {
 	LOG_ENTER;
-	finalize_hook = nullptr;
-	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &SinkWriterNew);
+	finalize_hook = nullptr; // will be hooked when instance is created; see CreateSinkWriterFromURL
+	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL);
 	LOG_EXIT;
 }
 
 void Unhook()
 {
 	LOG_ENTER;
-	sinkwriter_hook = nullptr;
 	finalize_hook = nullptr;
+	sinkwriter_hook = nullptr;
 	LOG_EXIT;
 }

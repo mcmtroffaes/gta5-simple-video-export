@@ -23,6 +23,7 @@
     <ClCompile Include="sinkwriter.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="hook.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="sinkwriter.h" />
   </ItemGroup>
