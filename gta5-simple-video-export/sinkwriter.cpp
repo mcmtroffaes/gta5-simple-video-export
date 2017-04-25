@@ -1,51 +1,13 @@
+/* hooks into media foundation's sink writer for intercepting video/audio data */
+
 #include "sinkwriter.h"
 #include "logger.h"
-#include "../PolyHook/PolyHook/PolyHook.hpp"
+#include "hook.h"
 
 #include <mfplay.h>
 #include <mfreadwrite.h>
 
 #pragma comment(lib, "mfreadwrite.lib")
-
-template <class FuncType>
-std::unique_ptr<PLH::IATHook> CreateIATHook(const char *library_name, const char *func_name, FuncType new_func) {
-	LOG_ENTER;
-	std::unique_ptr<PLH::IATHook> hook(new PLH::IATHook());
-	hook->SetupHook(library_name, func_name, (BYTE*)new_func);
-	if (hook->Hook()) {
-		logger->debug("hook set for {}", func_name);
-	}
-	else {
-		hook = nullptr;
-		logger->debug("failed to hook {}", func_name);
-	}
-	return hook;
-	LOG_EXIT;
-}
-
-/* helper function to create a hook for a virtual function */
-template <class ClassType, class FuncType>
-std::unique_ptr<PLH::VFuncDetour> CreateVFuncDetour(ClassType *p_instance, int vfunc_index, FuncType new_func) {
-	LOG_ENTER;
-	std::unique_ptr<PLH::VFuncDetour> hook(new PLH::VFuncDetour());
-	if (!p_instance) {
-		hook = nullptr;
-		LOG_ERROR("hook failed: class instance is null");
-	}
-	else {
-		hook->SetupHook(*(BYTE***)p_instance, vfunc_index, (BYTE*)new_func);
-		if (hook->Hook()) {
-			LOG_DEBUG("hook set");
-		}
-		else {
-			hook = nullptr;
-			LOG_ERROR("hook failed");
-		}
-	}
-	LOG_EXIT;
-	return hook;
-}
-
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
@@ -95,6 +57,7 @@ HRESULT __stdcall SinkWriterNew(
 void Hook()
 {
 	LOG_ENTER;
+	finalize_hook = nullptr;
 	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &SinkWriterNew);
 	LOG_EXIT;
 }
