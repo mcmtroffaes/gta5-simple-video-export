@@ -19,6 +19,10 @@ struct AudioInfo {
 
 struct VideoInfo {
 	DWORD stream_index;
+	UINT32 width;
+	UINT32 height;
+	UINT32 framerate_numerator;
+	UINT32 framerate_denominator;
 	std::ofstream os;
 };
 
@@ -51,9 +55,9 @@ void Unhook()
 std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<AudioInfo> info(new AudioInfo);
-	GUID subtype = { 0 };
 	logger->debug("audio stream index = {}", stream_index);
 	info->stream_index = stream_index;
+	GUID subtype = { 0 };
 	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
 		if (subtype == MFAudioFormat_PCM) {
@@ -77,9 +81,9 @@ std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_
 std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<VideoInfo> info(new VideoInfo);
-	GUID subtype = { 0 };
 	logger->debug("video stream index = {}", stream_index);
 	info->stream_index = stream_index;
+	GUID subtype = { 0 };
 	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
 		if (subtype == MFVideoFormat_NV12) {
@@ -89,6 +93,14 @@ std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_
 			hr = E_FAIL;
 			logger->error("video format unsupported");
 		}
+	}
+	hr = MFGetAttributeSize(input_media_type, MF_MT_FRAME_SIZE, &info->width, &info->height);
+	if (SUCCEEDED(hr)) {
+		logger->info("video size = {}x{}", info->width, info->height);
+	}
+	hr = MFGetAttributeRatio(input_media_type, MF_MT_FRAME_RATE, &info->framerate_numerator, &info->framerate_denominator);
+	if (SUCCEEDED(hr)) {
+		logger->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
 	}
 	if (SUCCEEDED(hr)) {
 		info->os = std::ofstream("e:/video.yuv", std::ofstream::out | std::ofstream::binary);
