@@ -12,7 +12,6 @@
 #pragma comment(lib, "mfuuid.lib")
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
-std::unique_ptr<PLH::VFuncDetour> addstream_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> setinputmediatype_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
@@ -22,7 +21,6 @@ int stream_index_video = -1;
 void UnhookVFuncDetours()
 {
 	LOG_ENTER;
-	addstream_hook = nullptr;
 	setinputmediatype_hook = nullptr;
 	writesample_hook = nullptr;
 	finalize_hook = nullptr;
@@ -37,43 +35,6 @@ void Unhook()
 	UnhookVFuncDetours();
 	sinkwriter_hook = nullptr;
 	LOG_EXIT;
-}
-
-STDAPI SinkWriterAddStream(
-	IMFSinkWriter *pThis,
-	IMFMediaType  *pTargetMediaType,
-	DWORD         *pdwStreamIndex)
-{
-	LOG_ENTER;
-	if (!addstream_hook) {
-		logger->error("IMFSinkWriter::AddStream hook not set up");
-		return E_FAIL;
-	}
-	auto original_func = addstream_hook->GetOriginal<decltype(&SinkWriterAddStream)>();
-	logger->trace("IMFSinkWriter::AddStream: enter");
-	auto hr = original_func(pThis, pTargetMediaType, pdwStreamIndex);
-	logger->trace("IMFSinkWriter::AddStream: exit {}", hr);
-	if (SUCCEEDED(hr)) {
-		GUID majortype = { 0 };
-		auto hr2 = pTargetMediaType->GetGUID(MF_MT_MAJOR_TYPE, &majortype);
-		if (FAILED(hr2)) {
-			logger->error("failed to get major type");
-		}
-		else if (majortype == MFMediaType_Audio)
-		{
-			stream_index_audio = *pdwStreamIndex;
-			logger->trace("audio stream at index {}", stream_index_audio);
-		}
-		else if (majortype == MFMediaType_Video) {
-			stream_index_video = *pdwStreamIndex;
-			logger->trace("video stream at index {}", stream_index_video);
-		}
-		else {
-			logger->trace("unknown stream");
-		}
-	}
-	LOG_EXIT;
-	return hr;
 }
 
 STDAPI SinkWriterSetInputMediaType(
@@ -148,7 +109,6 @@ STDAPI CreateSinkWriterFromURL(
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
 	logger->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	if (SUCCEEDED(hr)) {
-		addstream_hook = CreateVFuncDetour(*ppSinkWriter, 3, &SinkWriterAddStream);
 		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
 		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);

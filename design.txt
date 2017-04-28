@@ -1,3 +1,6 @@
+Functions Hooked
+================
+
 // Create a sink writer. Allows us to get the IMFSinkWriter instance that is created for the video, and signals the start of the export.
 HRESULT MFCreateSinkWriterFromURL(LPCWSTR pwszOutputURL, IMFByteStream *pByteStream, IMFAttributes *pAttributes, IMFSinkWriter **ppSinkWriter);
 
@@ -9,3 +12,48 @@ HRESULT IMFSinkWriter::WriteSample(DWORD dwStreamIndex, IMFSample *pSample);
 
 // Flags end of writing. Signals the end of the export.
 HRESULT IMFSinkWriter::Finalize();
+
+Useful Reading
+==============
+
+Basic MFT Processing Model
+https://msdn.microsoft.com/en-us/library/windows/desktop/aa965264(v=vs.85).aspx
+
+Using MFTrace
+https://msdn.microsoft.com/en-us/library/windows/desktop/ff685370(v=vs.85).aspx
+
+Media Foundation Trace
+======================
+
+[initial creation of the mp4 file?]
+... MFStartup
+... MFCreateSourceResolver
+... CreateObjectFromURL -> video filename
+... MFShutdown
+
+[actual export]
+572 MFStartup
+582 MFCreateSinkWriterFromURL -> video filename
+670 IMFSinkWriter::AddStream (h264)
+676 IMFSinkWriter::SetInputMediaType
+  701 MFTEnumEx (input: any, output: h264)
+  943 MFTEnumEx (input: nv12, output: h264)
+  1075 IMFTransform::GetStreamCount
+  1077 IMFTransform::GetStreamCount
+  1079 IMFTransform::GetStreamIDs (fails: not implemented - fixed streams?)
+  1107 IMFTransform::GetStreamCount
+  1109 IMFTransform::GetStreamIDs (fails: not implemented - fixed streams?)
+  1111 IMFTransform::GetOutputCurrentType (fails: transform type not set)
+  1115 IMFTransform::SetInputType
+  1118 IMFTransform::SetOutputType
+  1129 IMFTransform::SetInputType (fails: transform type not set)
+  1148 IMFTransform::SetOutputType (h264)
+  1150 IMFTransform::SetInputType (nv12)
+  1167 IMFTransform::GetOutputCurrentType (now succeeds)
+  1169 [IMFSinkWriter::SetInputMediaType nv12 confirmed]
+1171 IMFSinkWriter::AddStream (aac)
+1177 IMFSinkWriter::SetInputMediaType
+  [... same MFTEnumEx and so but now for the audio ...]
+  1507 [IMFSinkWriter::SetInputMediaType pcm confirmed]
+1509 IMFSinkWriter::BeginWriting
+1600 IMFTransform::ProcessMessage (MFT_MESSAGE_NOTIFY_BEGIN_STREAMING)
