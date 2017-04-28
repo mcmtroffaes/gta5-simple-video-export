@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "hook.h"
 
+#include <fstream>
 #include <mfapi.h>
 #include <mfplay.h>
 #include <mfreadwrite.h>
@@ -13,10 +14,12 @@
 
 struct AudioInfo {
 	DWORD stream_index;
+	std::ofstream os;
 };
 
 struct VideoInfo {
 	DWORD stream_index;
+	std::ofstream os;
 };
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
@@ -45,20 +48,51 @@ void Unhook()
 	LOG_EXIT;
 }
 
-std::unique_ptr<AudioInfo> GetAudioMediaType(DWORD stream_index, const IMFMediaType & input_media_type) {
+std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<AudioInfo> info(new AudioInfo);
+	GUID subtype = { 0 };
 	logger->debug("audio stream index = {}", stream_index);
 	info->stream_index = stream_index;
+	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
+	if (SUCCEEDED(hr)) {
+		if (subtype == MFAudioFormat_PCM) {
+			logger->info("audio format = PCM");
+		}
+		else {
+			hr = E_FAIL;
+			logger->error("audio format unsupported");
+		}
+	}
+	if (SUCCEEDED(hr)) {
+		info->os = std::ofstream("e:/audio.raw", std::ofstream::out | std::ofstream::binary);
+	}
+	else {
+		info = nullptr;
+	}
 	LOG_EXIT;
 	return info;
 }
 
-std::unique_ptr<VideoInfo> GetVideoMediaType(DWORD stream_index, const IMFMediaType & input_media_type) {
+std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<VideoInfo> info(new VideoInfo);
+	GUID subtype = { 0 };
 	logger->debug("video stream index = {}", stream_index);
 	info->stream_index = stream_index;
+	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
+	if (SUCCEEDED(hr)) {
+		if (subtype == MFVideoFormat_NV12) {
+			logger->info("video format = NV12");
+		}
+		else {
+			hr = E_FAIL;
+			logger->error("video format unsupported");
+		}
+	}
+	if (SUCCEEDED(hr)) {
+		info->os = std::ofstream("e:/video.yuv", std::ofstream::out | std::ofstream::binary);
+	}
 	LOG_EXIT;
 	return info;
 }
@@ -86,10 +120,10 @@ STDAPI SinkWriterSetInputMediaType(
 			logger->error("failed to get major type for stream at index {}", dwStreamIndex);
 		}
 		else if (major_type == MFMediaType_Audio) {
-			audio_info = GetAudioMediaType(dwStreamIndex, *pInputMediaType);
+			audio_info = GetAudioInfo(dwStreamIndex, pInputMediaType);
 		}
 		else if (major_type == MFMediaType_Video) {
-			video_info = GetVideoMediaType(dwStreamIndex, *pInputMediaType);
+			video_info = GetVideoInfo(dwStreamIndex, pInputMediaType);
 		}
 		else {
 			logger->debug("unknown stream at index {}", dwStreamIndex);
@@ -99,13 +133,27 @@ STDAPI SinkWriterSetInputMediaType(
 	return hr;
 }
 
-void WriteAudioSample(const IMFSample & sample) {
+DWORD WriteSample(IMFSample *sample, std::ostream & os) {
+	IMFMediaBuffer *p_media_buffer = nullptr;
+	BYTE *p_buffer = nullptr;
+	DWORD buffer_length = 0;
 	LOG_ENTER;
-	LOG_EXIT;
-}
-
-void WriteVideoSample(const IMFSample & sample) {
-	LOG_ENTER;
+	auto hr = sample->ConvertToContiguousBuffer(&p_media_buffer);
+	if (SUCCEEDED(hr))
+	{
+		auto hr = p_media_buffer->Lock(&p_buffer, NULL, &buffer_length);
+	}
+	if (SUCCEEDED(hr))
+	{
+		logger->debug("writing {} bytes", buffer_length);
+		os.write((const char *)p_buffer, buffer_length);
+		hr = p_media_buffer->Unlock();
+	}
+	if (p_media_buffer)
+	{
+		p_media_buffer->Release();
+	}
+	return buffer_length;
 	LOG_EXIT;
 }
 
@@ -115,6 +163,9 @@ STDAPI SinkWriterWriteSample(
 	IMFSample     *pSample)
 {
 	LOG_ENTER;
+	auto hr = S_OK;
+	// we don't need to call the original
+	/*
 	if (!writesample_hook) {
 		logger->error("IMFSinkWriter::WriteSample hook not set up");
 		return E_FAIL;
@@ -123,14 +174,15 @@ STDAPI SinkWriterWriteSample(
 	logger->trace("IMFSinkWriter::WriteSample: enter");
 	auto hr = original_func(pThis, dwStreamIndex, pSample);
 	logger->trace("IMFSinkWriter::WriteSample: exit {}", hr);
+	*/
 	if (audio_info) {
 		if (dwStreamIndex == audio_info->stream_index) {
-			WriteAudioSample(*pSample);
+			WriteSample(pSample, audio_info->os);
 		}
 	}
 	if (video_info) {
 		if (dwStreamIndex == video_info->stream_index) {
-			WriteVideoSample(*pSample);
+			WriteSample(pSample, video_info->os);
 		}
 	}
 	LOG_EXIT;
@@ -151,6 +203,7 @@ STDAPI SinkWriterFinalize(
 	logger->trace("IMFSinkWriter::Finalize: exit {}", hr);
 	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 	UnhookVFuncDetours();
+	logger->info("export finished");
 	LOG_EXIT;
 	return hr;
 }
@@ -163,6 +216,7 @@ STDAPI CreateSinkWriterFromURL(
 	)
 {
 	LOG_ENTER;
+	logger->info("export started");
 	if (!sinkwriter_hook) {
 		logger->error("MFCreateSinkWriterFromURL hook not set up");
 		return E_FAIL;
