@@ -5,12 +5,15 @@
 #include "hook.h"
 
 #include <fstream>
+#include <wrl/client.h> // ComPtr
 #include <mfapi.h>
 #include <mfplay.h>
 #include <mfreadwrite.h>
 
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
+
+using namespace Microsoft::WRL;
 
 struct AudioInfo {
 	DWORD stream_index;
@@ -146,11 +149,11 @@ STDAPI SinkWriterSetInputMediaType(
 }
 
 DWORD WriteSample(IMFSample *sample, std::ostream & os) {
-	IMFMediaBuffer *p_media_buffer = nullptr;
+	LOG_ENTER;
+	ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
 	BYTE *p_buffer = nullptr;
 	DWORD buffer_length = 0;
-	LOG_ENTER;
-	auto hr = sample->ConvertToContiguousBuffer(&p_media_buffer);
+	auto hr = sample->ConvertToContiguousBuffer(p_media_buffer.GetAddressOf());
 	if (SUCCEEDED(hr))
 	{
 		auto hr = p_media_buffer->Lock(&p_buffer, NULL, &buffer_length);
@@ -160,10 +163,6 @@ DWORD WriteSample(IMFSample *sample, std::ostream & os) {
 		logger->debug("writing {} bytes", buffer_length);
 		os.write((const char *)p_buffer, buffer_length);
 		hr = p_media_buffer->Unlock();
-	}
-	if (p_media_buffer)
-	{
-		p_media_buffer->Release();
 	}
 	return buffer_length;
 	LOG_EXIT;
