@@ -2,6 +2,7 @@
 
 #include "sinkwriter.h"
 #include "logger.h"
+#include "settings.h"
 #include "hook.h"
 
 #include <fstream>
@@ -230,16 +231,24 @@ STDAPI CreateSinkWriterFromURL(
 	logger->info("export started");
 	if (!sinkwriter_hook) {
 		logger->error("MFCreateSinkWriterFromURL hook not set up");
+		LOG_EXIT;
 		return E_FAIL;
 	}
 	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
 	logger->trace("MFCreateSinkWriterFromURL: enter");
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
 	logger->trace("MFCreateSinkWriterFromURL: exit {}", hr);
-	if (SUCCEEDED(hr)) {
-		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
-		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
-		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
+	if (settings->Load()) {
+		/* mod enabled; update hooks on success */
+		if (SUCCEEDED(hr)) {
+			setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
+			writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
+			finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
+		}
+	} else {
+		/* mod disabled; inform user and remove all hooks */
+		logger->info("mod disabled");
+		UnhookVFuncDetours();
 	}
 	LOG_EXIT;
 	return hr;
