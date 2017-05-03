@@ -109,6 +109,10 @@ Settings::Settings()
 	if (parser) {
 		parse(parser->top(), "log_level", log_level_);
 		parse(parser->top(), "log_flush_on", log_flush_on_);
+		if (logger) {
+			logger->set_level(settings->log_level_);
+			logger->flush_on(settings->log_flush_on_);
+		}
 		if (parse(parser->top(), "output_folder", output_folder_)) {
 			if (!DirectoryExists(output_folder_.c_str())) {
 				if (logger) logger->error("output_folder {} does not exist", output_folder_);
