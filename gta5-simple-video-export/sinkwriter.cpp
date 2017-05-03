@@ -73,7 +73,7 @@ std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_
 		}
 	}
 	if (SUCCEEDED(hr)) {
-		info->os = std::ofstream("e:/audio.raw", std::ofstream::out | std::ofstream::binary);
+		info->os = std::ofstream(settings->output_folder_ + "/audio.raw", std::ofstream::out | std::ofstream::binary);
 	}
 	else {
 		info = nullptr;
@@ -107,7 +107,7 @@ std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_
 		logger->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
 	}
 	if (SUCCEEDED(hr)) {
-		info->os = std::ofstream("e:/video.yuv", std::ofstream::out | std::ofstream::binary);
+		info->os = std::ofstream(settings->output_folder_ + "/video.yuv", std::ofstream::out | std::ofstream::binary);
 	}
 	LOG_EXIT;
 	return info;
@@ -238,7 +238,8 @@ STDAPI CreateSinkWriterFromURL(
 	logger->trace("MFCreateSinkWriterFromURL: enter");
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
 	logger->trace("MFCreateSinkWriterFromURL: exit {}", hr);
-	if (settings->Load()) {
+	settings.reset(new Settings);
+	if (!settings->output_folder_.empty()) {
 		/* mod enabled; update hooks on success */
 		if (SUCCEEDED(hr)) {
 			setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
@@ -247,7 +248,7 @@ STDAPI CreateSinkWriterFromURL(
 		}
 	} else {
 		/* mod disabled; inform user and remove all hooks */
-		logger->info("mod disabled");
+		logger->info("mod disabled due to empty output_folder");
 		UnhookVFuncDetours();
 	}
 	LOG_EXIT;

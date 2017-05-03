@@ -1,12 +1,10 @@
 #include "settings.h"
 #include "logger.h"
+#include "../ini-parser/ini.hpp"
 
-const std::string Settings::ini_filename_ = SCRIPT_FOLDER "\\config.ini";
-
-Settings::Settings()
-	: output_folder_(), log_level_(spdlog::level::info), log_flush_on_(spdlog::level::off)
-{
-}
+// note: in this entire code, logger can be nullptr
+// because we need to read the settings before the logger is set up
+// when the mod is initialised
 
 bool convert(const std::string & value_str, std::string & value)
 {
@@ -63,37 +61,63 @@ bool convert(const std::string & value_str, spdlog::level::level_enum & value) {
 template <typename T>
 bool parse(const INI::Level & level, const std::string & name, T & value)
 {
-	LOG_ENTER;
+	// note: logger may not have been initialized yet, need to check each time
+	SAFE_LOG_ENTER;
 	auto success = false;
 	auto keyvalue = level.values.find(name);
 	if (keyvalue == level.values.end()) {
-		logger->debug("{} not set", name);
+		if (logger) logger->debug("{} not set", name);
 	}
 	else {
 		auto value_str = keyvalue->second;
 		success = convert(value_str, value);
 		if (success) {
-			logger->debug("{} = {}", name, value_str);
+			if (logger) logger->debug("{} = {}", name, value_str);
 		}
 		else {
-			logger->error("{} = parse error ({})", name, value_str);
+			if (logger) logger->error("{} = parse error ({})", name, value_str);
 		}
 	}
-	LOG_EXIT;
+	SAFE_LOG_EXIT;
 	return success;
 }
 
-bool Settings::Load() {
-	LOG_ENTER;
-	INI::Parser parser(ini_filename_.c_str());
-	log_level_ = spdlog::level::info;
-	parse(parser.top(), "log_level", log_level_);
-	parse(parser.top(), "log_flush_on", log_flush_on_);
-	if (!parse(parser.top(), "output_folder", output_folder_)) {
-		logger->error("mod disabled as output_folder is missing");
-		LOG_EXIT;
-		return false;
+BOOL DirectoryExists(LPCSTR szPath)
+{
+	DWORD dwAttrib = GetFileAttributesA(szPath);
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+const std::string Settings::ini_filename_ = SCRIPT_FOLDER "\\config.ini";
+
+Settings::Settings()
+	: log_level_(spdlog::level::info)
+	, log_flush_on_(spdlog::level::off)
+	, output_folder_()
+{
+	SAFE_LOG_ENTER;
+	std::unique_ptr<INI::Parser> parser = nullptr;
+	try {
+		parser.reset(new INI::Parser(ini_filename_.c_str()));
 	}
-	LOG_EXIT;
-	return true;
+	catch (const std::exception & ex) {
+		if (logger) logger->error("{} parse error ({})", ini_filename_, ex.what());
+	}
+	catch (...) {
+		if (logger) logger->error("{} unknown parse error", ini_filename_);
+	}
+	if (parser) {
+		parse(parser->top(), "log_level", log_level_);
+		parse(parser->top(), "log_flush_on", log_flush_on_);
+		if (parse(parser->top(), "output_folder", output_folder_)) {
+			if (!DirectoryExists(output_folder_.c_str())) {
+				if (logger) logger->error("output_folder {} does not exist", output_folder_);
+				output_folder_ = "";
+			}
+		}
+		else {
+			if (logger) logger->error("no output_folder specified in {}", ini_filename_);
+		}
+	}
+	SAFE_LOG_EXIT;
 }
