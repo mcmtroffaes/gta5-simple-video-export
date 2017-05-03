@@ -7,12 +7,15 @@
 
 #include <fstream>
 #include <wrl/client.h> // ComPtr
+
 #include <mfapi.h>
 #include <mfplay.h>
 #include <mfreadwrite.h>
-
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
+
+#include <Shlwapi.h> // PathCombine
+#pragma comment(lib, "Shlwapi.lib")
 
 using namespace Microsoft::WRL;
 
@@ -56,6 +59,19 @@ void Unhook()
 	LOG_EXIT;
 }
 
+auto OpenFile(std::ofstream & os, const std::string & filename) {
+	char path[MAX_PATH] = "";
+	if (PathCombineA(path, settings->output_folder_.c_str(), filename.c_str()) == nullptr) {
+		logger->error("could not combine {} and {} to form path of output stream", settings->output_folder_, filename);
+		return E_FAIL;
+	}
+	else {
+		logger->info("opening {} for writing", path);
+		os = std::ofstream(path, std::ofstream::out | std::ofstream::binary);
+		return S_OK;
+	}
+}
+
 std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<AudioInfo> info(new AudioInfo);
@@ -73,9 +89,9 @@ std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_
 		}
 	}
 	if (SUCCEEDED(hr)) {
-		info->os = std::ofstream(settings->output_folder_ + "/audio.raw", std::ofstream::out | std::ofstream::binary);
+		hr = OpenFile(info->os, "audio.raw");
 	}
-	else {
+	if (FAILED(hr)) {
 		info = nullptr;
 	}
 	LOG_EXIT;
@@ -107,7 +123,10 @@ std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_
 		logger->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
 	}
 	if (SUCCEEDED(hr)) {
-		info->os = std::ofstream(settings->output_folder_ + "/video.yuv", std::ofstream::out | std::ofstream::binary);
+		hr = OpenFile(info->os, "video.yuv");
+	}
+	if (FAILED(hr)) {
+		info = nullptr;
 	}
 	LOG_EXIT;
 	return info;
