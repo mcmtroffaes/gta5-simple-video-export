@@ -19,9 +19,55 @@
 
 using namespace Microsoft::WRL;
 
+// a HANDLE which closes itself upon destruction
+class FileHandle {
+public:
+	FileHandle() : handle_(INVALID_HANDLE_VALUE) {}
+	FileHandle(HANDLE handle) : handle_(handle) {}
+	~FileHandle() {
+		LOG_ENTER;
+		if (handle_ != INVALID_HANDLE_VALUE) {
+			logger->debug("closing handle");
+			CloseHandle(handle_);
+		}
+		LOG_EXIT;
+	};
+	auto Handle() const { return handle_; }
+private:
+	HANDLE handle_;
+};
+
+static std::unique_ptr<FileHandle> CreateFileHandle(const std::string & filename) {
+	LOG_ENTER;
+	logger->info("opening file {} for writing", filename);
+	auto handle = CreateFileA(filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (handle == NULL || handle == INVALID_HANDLE_VALUE) {
+		logger->error("failed to create file {}", filename);
+		return nullptr;
+	}
+	else {
+		return std::unique_ptr<FileHandle>(new FileHandle(handle));
+	}
+	LOG_EXIT;
+}
+
+static std::unique_ptr<FileHandle> CreatePipeHandle(const std::string & filename) {
+	LOG_ENTER;
+	logger->info("opening pipe {} for writing", filename);
+	auto handle = CreateNamedPipeA(filename.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
+	if (handle == INVALID_HANDLE_VALUE) {
+		logger->error("failed to create pipe {}", filename);
+		return nullptr;
+	}
+	else {
+		return std::unique_ptr<FileHandle>(new FileHandle(handle));
+	}
+	LOG_EXIT;
+}
+
 struct AudioInfo {
 	DWORD stream_index;
-	std::ofstream os;
+	std::unique_ptr<FileHandle> os;
 };
 
 struct VideoInfo {
@@ -30,7 +76,7 @@ struct VideoInfo {
 	UINT32 height;
 	UINT32 framerate_numerator;
 	UINT32 framerate_denominator;
-	std::ofstream os;
+	std::unique_ptr<FileHandle> os;
 };
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
@@ -59,17 +105,23 @@ void Unhook()
 	LOG_EXIT;
 }
 
-auto OpenFile(std::ofstream & os, const std::string & filename) {
+std::unique_ptr<FileHandle> OpenOutputFile(const std::string & filename) {
+	LOG_ENTER;
+	std::unique_ptr<FileHandle> filehandle = nullptr;
 	char path[MAX_PATH] = "";
 	if (PathCombineA(path, settings->output_folder_.c_str(), filename.c_str()) == nullptr) {
 		logger->error("could not combine {} and {} to form path of output stream", settings->output_folder_, filename);
-		return E_FAIL;
 	}
 	else {
-		logger->info("opening {} for writing", path);
-		os = std::ofstream(path, std::ofstream::out | std::ofstream::binary);
-		return S_OK;
+		if (settings->output_folder_.substr(0, 8) == "\\\\.\\pipe") {
+			filehandle = CreatePipeHandle(path);
+		}
+		else {
+			filehandle = CreateFileHandle(path);
+		}
 	}
+	LOG_EXIT;
+	return filehandle;
 }
 
 std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_media_type) {
@@ -89,7 +141,8 @@ std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_
 		}
 	}
 	if (SUCCEEDED(hr)) {
-		hr = OpenFile(info->os, "audio.raw");
+		info->os = OpenOutputFile("audio.raw");
+		hr = (info->os ? S_OK : E_FAIL);
 	}
 	if (FAILED(hr)) {
 		info = nullptr;
@@ -123,7 +176,8 @@ std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_
 		logger->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
 	}
 	if (SUCCEEDED(hr)) {
-		hr = OpenFile(info->os, "video.yuv");
+		info->os = OpenOutputFile("video.yuv");
+		hr = (info->os ? S_OK : E_FAIL);
 	}
 	if (FAILED(hr)) {
 		info = nullptr;
@@ -168,7 +222,7 @@ STDAPI SinkWriterSetInputMediaType(
 	return hr;
 }
 
-DWORD WriteSample(IMFSample *sample, std::ostream & os) {
+DWORD WriteSample(IMFSample *sample, std::unique_ptr<FileHandle> & os) {
 	LOG_ENTER;
 	ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
 	BYTE *p_buffer = nullptr;
@@ -181,7 +235,13 @@ DWORD WriteSample(IMFSample *sample, std::ostream & os) {
 	if (SUCCEEDED(hr))
 	{
 		logger->debug("writing {} bytes", buffer_length);
-		os.write((const char *)p_buffer, buffer_length);
+		DWORD num_bytes_written = 0;
+		if (!WriteFile(os->Handle(), (const char *)p_buffer, buffer_length, &num_bytes_written, NULL)) {
+			logger->error("writing failed");
+		}
+		if (num_bytes_written != buffer_length) {
+			logger->error("only written {} bytes out of {} bytes", num_bytes_written, buffer_length);
+		}
 		hr = p_media_buffer->Unlock();
 	}
 	return buffer_length;
