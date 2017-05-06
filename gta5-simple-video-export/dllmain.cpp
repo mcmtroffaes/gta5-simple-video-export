@@ -22,6 +22,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		LOG_ENTER;
 		/* set up hooks */
 		Hook();
+		LOG->info(SCRIPT_NAME " attached");
 		break;
 	case DLL_PROCESS_DETACH:
 		/* clean up hooks */
@@ -29,6 +30,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		/* clean up settings */
 		settings = nullptr;
 		/* clean up logger */
+		LOG->info(SCRIPT_NAME " detached");
 		LOG_EXIT;
 		logger = nullptr;
 		spdlog::drop(SCRIPT_NAME);
