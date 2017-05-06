@@ -6,7 +6,6 @@
 #include "hook.h"
 #include "filehandle.h"
 
-#include <fstream>
 #include <wrl/client.h> // ComPtr
 
 #include <mfapi.h>
