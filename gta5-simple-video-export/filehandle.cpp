@@ -20,13 +20,23 @@ FileHandle::FileHandle(const std::string & filename) : FileHandle() {
 			if (path_.substr(0, pipe_prefix.length()) == pipe_prefix) {
 				LOG->info("opening pipe {} for writing", path_);
 				handle_ = CreateNamedPipeA(path_.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
+				if (!IsValid()) {
+					LOG->error("failed to create pipe");
+				}
+				else {
+					if (!ConnectNamedPipe(handle_, NULL)) {
+						LOG->error("failed to make connection on pipe");
+						CloseHandle(handle_); // close the pipe
+						handle_ = INVALID_HANDLE_VALUE;
+					}
+				}
 			}
 			else {
 				LOG->info("opening file {} for writing", path_);
 				handle_ = CreateFileA(path_.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			}
-			if (!IsValid()) {
-				LOG->error("failed to create file {}", path_);
+				if (!IsValid()) {
+					LOG->error("failed to create file");
+				}
 			}
 		}
 	}
