@@ -16,6 +16,15 @@
 
 using namespace Microsoft::WRL;
 
+std::string GUIDToString(const GUID & guid) {
+	char buffer[48];
+	snprintf(buffer, sizeof(buffer), "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
+		guid.Data1, guid.Data2, guid.Data3,
+		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
+		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+	return std::string(buffer);
+}
+
 struct AudioInfo {
 	DWORD stream_index;
 	FileHandle os;
@@ -65,7 +74,7 @@ std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_
 	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
 		if (subtype == MFAudioFormat_PCM) {
-			LOG->info("audio format = PCM");
+			LOG->info("audio format = PCM ({})", GUIDToString(subtype));
 		}
 		else {
 			hr = E_FAIL;
@@ -92,7 +101,7 @@ std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_
 	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
 		if (subtype == MFVideoFormat_NV12) {
-			LOG->info("video format = NV12");
+			LOG->info("video format = NV12 ({})", GUIDToString(subtype));
 		}
 		else {
 			hr = E_FAIL;
