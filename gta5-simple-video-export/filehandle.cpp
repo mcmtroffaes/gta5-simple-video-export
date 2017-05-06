@@ -2,41 +2,30 @@
 #include "logger.h"
 #include "settings.h"
 
-#include <Shlwapi.h> // PathCombine
-#pragma comment(lib, "Shlwapi.lib")
-
 FileHandle::FileHandle() : handle_(INVALID_HANDLE_VALUE), path_() {};
 
-FileHandle::FileHandle(const std::string & filename) : FileHandle() {
+FileHandle::FileHandle(const std::string & path, bool pipe) : FileHandle() {
 	LOG_ENTER;
-	if (settings) {
-		char path[MAX_PATH] = "";
-		if (PathCombineA(path, settings->raw_folder_.c_str(), filename.c_str()) == nullptr) {
-			LOG->error("could not combine {} and {} to form path of output stream", settings->raw_folder_, filename);
+	path_ = path;
+	if (pipe) {
+		LOG->info("opening pipe {} for writing", path_);
+		handle_ = CreateNamedPipeA(path_.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
+		if (!IsValid()) {
+			LOG->error("failed to create pipe");
 		}
 		else {
-			path_ = path;
-			if (settings->IsRawFolderPipe()) {
-				LOG->info("opening pipe {} for writing", path_);
-				handle_ = CreateNamedPipeA(path_.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
-				if (!IsValid()) {
-					LOG->error("failed to create pipe");
-				}
-				else {
-					if (!ConnectNamedPipe(handle_, NULL)) {
-						LOG->error("failed to make connection on pipe");
-						CloseHandle(handle_); // close the pipe
-						handle_ = INVALID_HANDLE_VALUE;
-					}
-				}
+			if (!ConnectNamedPipe(handle_, NULL)) {
+				LOG->error("failed to make connection on pipe");
+				CloseHandle(handle_); // close the pipe
+				handle_ = INVALID_HANDLE_VALUE;
 			}
-			else {
-				LOG->info("opening file {} for writing", path_);
-				handle_ = CreateFileA(path_.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-				if (!IsValid()) {
-					LOG->error("failed to create file");
-				}
-			}
+		}
+	}
+	else {
+		LOG->info("opening file {} for writing", path_);
+		handle_ = CreateFileA(path_.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (!IsValid()) {
+			LOG->error("failed to create file");
 		}
 	}
 	LOG_EXIT;
@@ -45,7 +34,7 @@ FileHandle::FileHandle(const std::string & filename) : FileHandle() {
 FileHandle::~FileHandle() {
 	LOG_ENTER;
 	if (IsValid()) {
-		LOG->debug("closing {}", path_);
+		LOG->info("closing {}", path_);
 		CloseHandle(handle_);
 	}
 	LOG_EXIT;

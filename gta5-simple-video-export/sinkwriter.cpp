@@ -4,7 +4,7 @@
 #include "logger.h"
 #include "settings.h"
 #include "hook.h"
-#include "filehandle.h"
+#include "info.h"
 
 #include <wrl/client.h> // ComPtr
 
@@ -16,35 +16,13 @@
 
 using namespace Microsoft::WRL;
 
-std::string GUIDToString(const GUID & guid) {
-	char buffer[48];
-	snprintf(buffer, sizeof(buffer), "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
-		guid.Data1, guid.Data2, guid.Data3,
-		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
-		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
-	return std::string(buffer);
-}
-
-struct AudioInfo {
-	DWORD stream_index;
-	FileHandle os;
-};
-
-struct VideoInfo {
-	DWORD stream_index;
-	UINT32 width;
-	UINT32 height;
-	UINT32 framerate_numerator;
-	UINT32 framerate_denominator;
-	FileHandle os;
-};
-
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> setinputmediatype_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
+std::unique_ptr<GeneralInfo> info = nullptr;
 
 void UnhookVFuncDetours()
 {
@@ -54,6 +32,7 @@ void UnhookVFuncDetours()
 	finalize_hook = nullptr;
 	audio_info = nullptr;
 	video_info = nullptr;
+	info = nullptr;
 	LOG_EXIT;
 }
 
@@ -63,68 +42,6 @@ void Unhook()
 	UnhookVFuncDetours();
 	sinkwriter_hook = nullptr;
 	LOG_EXIT;
-}
-
-std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_media_type) {
-	LOG_ENTER;
-	std::unique_ptr<AudioInfo> info(new AudioInfo);
-	LOG->debug("audio stream index = {}", stream_index);
-	info->stream_index = stream_index;
-	GUID subtype = { 0 };
-	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
-	if (SUCCEEDED(hr)) {
-		if (subtype == MFAudioFormat_PCM) {
-			LOG->info("audio format = PCM ({})", GUIDToString(subtype));
-		}
-		else {
-			hr = E_FAIL;
-			LOG->error("audio format unsupported");
-		}
-	}
-	if (SUCCEEDED(hr)) {
-		info->os = FileHandle("audio.raw");
-		hr = (info->os.IsValid() ? S_OK : E_FAIL);
-	}
-	if (FAILED(hr)) {
-		info = nullptr;
-	}
-	LOG_EXIT;
-	return info;
-}
-
-std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_media_type) {
-	LOG_ENTER;
-	std::unique_ptr<VideoInfo> info(new VideoInfo);
-	LOG->debug("video stream index = {}", stream_index);
-	info->stream_index = stream_index;
-	GUID subtype = { 0 };
-	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
-	if (SUCCEEDED(hr)) {
-		if (subtype == MFVideoFormat_NV12) {
-			LOG->info("video format = NV12 ({})", GUIDToString(subtype));
-		}
-		else {
-			hr = E_FAIL;
-			LOG->error("video format unsupported");
-		}
-	}
-	hr = MFGetAttributeSize(input_media_type, MF_MT_FRAME_SIZE, &info->width, &info->height);
-	if (SUCCEEDED(hr)) {
-		LOG->info("video size = {}x{}", info->width, info->height);
-	}
-	hr = MFGetAttributeRatio(input_media_type, MF_MT_FRAME_RATE, &info->framerate_numerator, &info->framerate_denominator);
-	if (SUCCEEDED(hr)) {
-		LOG->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
-	}
-	if (SUCCEEDED(hr)) {
-		info->os = FileHandle("video.yuv");
-		hr = (info->os.IsValid() ? S_OK : E_FAIL);
-	}
-	if (FAILED(hr)) {
-		info = nullptr;
-	}
-	LOG_EXIT;
-	return info;
 }
 
 STDAPI SinkWriterSetInputMediaType(
@@ -150,10 +67,14 @@ STDAPI SinkWriterSetInputMediaType(
 			LOG->error("failed to get major type for stream at index {}", dwStreamIndex);
 		}
 		else if (major_type == MFMediaType_Audio) {
-			audio_info = GetAudioInfo(dwStreamIndex, pInputMediaType);
+			if (settings && info) {
+				audio_info.reset(new AudioInfo(dwStreamIndex, *pInputMediaType, *settings, *info));
+			}
 		}
 		else if (major_type == MFMediaType_Video) {
-			video_info = GetVideoInfo(dwStreamIndex, pInputMediaType);
+			if (settings && info) {
+				video_info.reset(new VideoInfo(dwStreamIndex, *pInputMediaType, *settings, *info));
+			}
 		}
 		else {
 			LOG->debug("unknown stream at index {}", dwStreamIndex);
@@ -207,14 +128,14 @@ STDAPI SinkWriterWriteSample(
 	auto hr = original_func(pThis, dwStreamIndex, pSample);
 	LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
 	*/
-	if (audio_info) {
-		if (dwStreamIndex == audio_info->stream_index) {
-			WriteSample(pSample, audio_info->os.Handle());
+	if (audio_info && audio_info->os_ && audio_info->os_->IsValid()) {
+		if (dwStreamIndex == audio_info->stream_index_) {
+			WriteSample(pSample, audio_info->os_->Handle());
 		}
 	}
-	if (video_info) {
-		if (dwStreamIndex == video_info->stream_index) {
-			WriteSample(pSample, video_info->os.Handle());
+	if (video_info && video_info->os_ && video_info->os_->IsValid()) {
+		if (dwStreamIndex == video_info->stream_index_) {
+			WriteSample(pSample, video_info->os_->Handle());
 		}
 	}
 	LOG_EXIT;
@@ -233,6 +154,16 @@ STDAPI SinkWriterFinalize(
 	LOG->trace("IMFSinkWriter::Finalize: enter");
 	auto hr = original_func(pThis);
 	LOG->trace("IMFSinkWriter::Finalize: exit {}", hr);
+	/* client command */
+	if (settings && info && audio_info && video_info) {
+		std::string executable = settings->client_executable_;
+		info->Substitute(executable);
+		std::string args = settings->client_args_;
+		info->Substitute(args);
+		audio_info->Substitute(args);
+		video_info->Substitute(args);
+		LOG->info("{} {}", executable, args);
+	}
 	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 	UnhookVFuncDetours();
 	LOG->info("export finished");
@@ -260,6 +191,7 @@ STDAPI CreateSinkWriterFromURL(
 	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
+	info.reset(new GeneralInfo);
 	if (!settings->enable_) {
 		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();
