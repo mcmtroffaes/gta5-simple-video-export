@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "settings.h"
 #include "hook.h"
+#include "filehandle.h"
 
 #include <fstream>
 #include <wrl/client.h> // ComPtr
@@ -14,60 +15,11 @@
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
 
-#include <Shlwapi.h> // PathCombine
-#pragma comment(lib, "Shlwapi.lib")
-
 using namespace Microsoft::WRL;
-
-// a HANDLE which closes itself upon destruction
-class FileHandle {
-public:
-	FileHandle() : handle_(INVALID_HANDLE_VALUE) {}
-	FileHandle(HANDLE handle) : handle_(handle) {}
-	~FileHandle() {
-		LOG_ENTER;
-		if (handle_ != INVALID_HANDLE_VALUE) {
-			LOG->debug("closing handle");
-			CloseHandle(handle_);
-		}
-		LOG_EXIT;
-	};
-	auto Handle() const { return handle_; }
-private:
-	HANDLE handle_;
-};
-
-static std::unique_ptr<FileHandle> CreateFileHandle(const std::string & filename) {
-	LOG_ENTER;
-	LOG->info("opening file {} for writing", filename);
-	auto handle = CreateFileA(filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (handle == NULL || handle == INVALID_HANDLE_VALUE) {
-		LOG->error("failed to create file {}", filename);
-		return nullptr;
-	}
-	else {
-		return std::unique_ptr<FileHandle>(new FileHandle(handle));
-	}
-	LOG_EXIT;
-}
-
-static std::unique_ptr<FileHandle> CreatePipeHandle(const std::string & filename) {
-	LOG_ENTER;
-	LOG->info("opening pipe {} for writing", filename);
-	auto handle = CreateNamedPipeA(filename.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
-	if (handle == INVALID_HANDLE_VALUE) {
-		LOG->error("failed to create pipe {}", filename);
-		return nullptr;
-	}
-	else {
-		return std::unique_ptr<FileHandle>(new FileHandle(handle));
-	}
-	LOG_EXIT;
-}
 
 struct AudioInfo {
 	DWORD stream_index;
-	std::unique_ptr<FileHandle> os;
+	FileHandle os;
 };
 
 struct VideoInfo {
@@ -76,7 +28,7 @@ struct VideoInfo {
 	UINT32 height;
 	UINT32 framerate_numerator;
 	UINT32 framerate_denominator;
-	std::unique_ptr<FileHandle> os;
+	FileHandle os;
 };
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
@@ -105,25 +57,6 @@ void Unhook()
 	LOG_EXIT;
 }
 
-std::unique_ptr<FileHandle> OpenOutputFile(const std::string & filename) {
-	LOG_ENTER;
-	std::unique_ptr<FileHandle> filehandle = nullptr;
-	char path[MAX_PATH] = "";
-	if (PathCombineA(path, settings->output_folder_.c_str(), filename.c_str()) == nullptr) {
-		LOG->error("could not combine {} and {} to form path of output stream", settings->output_folder_, filename);
-	}
-	else {
-		if (settings->output_folder_.substr(0, 8) == "\\\\.\\pipe") {
-			filehandle = CreatePipeHandle(path);
-		}
-		else {
-			filehandle = CreateFileHandle(path);
-		}
-	}
-	LOG_EXIT;
-	return filehandle;
-}
-
 std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<AudioInfo> info(new AudioInfo);
@@ -141,8 +74,8 @@ std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_
 		}
 	}
 	if (SUCCEEDED(hr)) {
-		info->os = OpenOutputFile("audio.raw");
-		hr = (info->os ? S_OK : E_FAIL);
+		info->os = FileHandle("audio.raw");
+		hr = (info->os.IsValid() ? S_OK : E_FAIL);
 	}
 	if (FAILED(hr)) {
 		info = nullptr;
@@ -176,8 +109,8 @@ std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_
 		LOG->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
 	}
 	if (SUCCEEDED(hr)) {
-		info->os = OpenOutputFile("video.yuv");
-		hr = (info->os ? S_OK : E_FAIL);
+		info->os = FileHandle("video.yuv");
+		hr = (info->os.IsValid() ? S_OK : E_FAIL);
 	}
 	if (FAILED(hr)) {
 		info = nullptr;
@@ -222,7 +155,7 @@ STDAPI SinkWriterSetInputMediaType(
 	return hr;
 }
 
-DWORD WriteSample(IMFSample *sample, std::unique_ptr<FileHandle> & os) {
+DWORD WriteSample(IMFSample *sample, HANDLE handle) {
 	LOG_ENTER;
 	ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
 	BYTE *p_buffer = nullptr;
@@ -236,7 +169,7 @@ DWORD WriteSample(IMFSample *sample, std::unique_ptr<FileHandle> & os) {
 	{
 		LOG->debug("writing {} bytes", buffer_length);
 		DWORD num_bytes_written = 0;
-		if (!WriteFile(os->Handle(), (const char *)p_buffer, buffer_length, &num_bytes_written, NULL)) {
+		if (!WriteFile(handle, (const char *)p_buffer, buffer_length, &num_bytes_written, NULL)) {
 			LOG->error("writing failed");
 		}
 		if (num_bytes_written != buffer_length) {
@@ -268,12 +201,12 @@ STDAPI SinkWriterWriteSample(
 	*/
 	if (audio_info) {
 		if (dwStreamIndex == audio_info->stream_index) {
-			WriteSample(pSample, audio_info->os);
+			WriteSample(pSample, audio_info->os.Handle());
 		}
 	}
 	if (video_info) {
 		if (dwStreamIndex == video_info->stream_index) {
-			WriteSample(pSample, video_info->os);
+			WriteSample(pSample, video_info->os.Handle());
 		}
 	}
 	LOG_EXIT;

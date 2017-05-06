@@ -20,10 +20,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="filehandle.cpp" />
     <ClCompile Include="settings.cpp" />
     <ClCompile Include="sinkwriter.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="filehandle.h" />
     <ClInclude Include="hook.h" />
     <ClInclude Include="settings.h" />
     <ClInclude Include="logger.h" />
