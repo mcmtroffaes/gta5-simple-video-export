@@ -27,7 +27,7 @@ public:
 	~FileHandle() {
 		LOG_ENTER;
 		if (handle_ != INVALID_HANDLE_VALUE) {
-			logger->debug("closing handle");
+			LOG->debug("closing handle");
 			CloseHandle(handle_);
 		}
 		LOG_EXIT;
@@ -39,10 +39,10 @@ private:
 
 static std::unique_ptr<FileHandle> CreateFileHandle(const std::string & filename) {
 	LOG_ENTER;
-	logger->info("opening file {} for writing", filename);
+	LOG->info("opening file {} for writing", filename);
 	auto handle = CreateFileA(filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (handle == NULL || handle == INVALID_HANDLE_VALUE) {
-		logger->error("failed to create file {}", filename);
+		LOG->error("failed to create file {}", filename);
 		return nullptr;
 	}
 	else {
@@ -53,10 +53,10 @@ static std::unique_ptr<FileHandle> CreateFileHandle(const std::string & filename
 
 static std::unique_ptr<FileHandle> CreatePipeHandle(const std::string & filename) {
 	LOG_ENTER;
-	logger->info("opening pipe {} for writing", filename);
+	LOG->info("opening pipe {} for writing", filename);
 	auto handle = CreateNamedPipeA(filename.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {
-		logger->error("failed to create pipe {}", filename);
+		LOG->error("failed to create pipe {}", filename);
 		return nullptr;
 	}
 	else {
@@ -110,7 +110,7 @@ std::unique_ptr<FileHandle> OpenOutputFile(const std::string & filename) {
 	std::unique_ptr<FileHandle> filehandle = nullptr;
 	char path[MAX_PATH] = "";
 	if (PathCombineA(path, settings->output_folder_.c_str(), filename.c_str()) == nullptr) {
-		logger->error("could not combine {} and {} to form path of output stream", settings->output_folder_, filename);
+		LOG->error("could not combine {} and {} to form path of output stream", settings->output_folder_, filename);
 	}
 	else {
 		if (settings->output_folder_.substr(0, 8) == "\\\\.\\pipe") {
@@ -127,17 +127,17 @@ std::unique_ptr<FileHandle> OpenOutputFile(const std::string & filename) {
 std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<AudioInfo> info(new AudioInfo);
-	logger->debug("audio stream index = {}", stream_index);
+	LOG->debug("audio stream index = {}", stream_index);
 	info->stream_index = stream_index;
 	GUID subtype = { 0 };
 	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
 		if (subtype == MFAudioFormat_PCM) {
-			logger->info("audio format = PCM");
+			LOG->info("audio format = PCM");
 		}
 		else {
 			hr = E_FAIL;
-			logger->error("audio format unsupported");
+			LOG->error("audio format unsupported");
 		}
 	}
 	if (SUCCEEDED(hr)) {
@@ -154,26 +154,26 @@ std::unique_ptr<AudioInfo> GetAudioInfo(DWORD stream_index, IMFMediaType *input_
 std::unique_ptr<VideoInfo> GetVideoInfo(DWORD stream_index, IMFMediaType *input_media_type) {
 	LOG_ENTER;
 	std::unique_ptr<VideoInfo> info(new VideoInfo);
-	logger->debug("video stream index = {}", stream_index);
+	LOG->debug("video stream index = {}", stream_index);
 	info->stream_index = stream_index;
 	GUID subtype = { 0 };
 	auto hr = input_media_type->GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
 		if (subtype == MFVideoFormat_NV12) {
-			logger->info("video format = NV12");
+			LOG->info("video format = NV12");
 		}
 		else {
 			hr = E_FAIL;
-			logger->error("video format unsupported");
+			LOG->error("video format unsupported");
 		}
 	}
 	hr = MFGetAttributeSize(input_media_type, MF_MT_FRAME_SIZE, &info->width, &info->height);
 	if (SUCCEEDED(hr)) {
-		logger->info("video size = {}x{}", info->width, info->height);
+		LOG->info("video size = {}x{}", info->width, info->height);
 	}
 	hr = MFGetAttributeRatio(input_media_type, MF_MT_FRAME_RATE, &info->framerate_numerator, &info->framerate_denominator);
 	if (SUCCEEDED(hr)) {
-		logger->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
+		LOG->info("video framerate = {}/{}", info->framerate_numerator, info->framerate_denominator);
 	}
 	if (SUCCEEDED(hr)) {
 		info->os = OpenOutputFile("video.yuv");
@@ -194,19 +194,19 @@ STDAPI SinkWriterSetInputMediaType(
 {
 	LOG_ENTER;
 	if (!setinputmediatype_hook) {
-		logger->error("IMFSinkWriter::SetInputMediaType hook not set up");
+		LOG->error("IMFSinkWriter::SetInputMediaType hook not set up");
 		LOG_EXIT;
 		return E_FAIL;
 	}
 	auto original_func = setinputmediatype_hook->GetOriginal<decltype(&SinkWriterSetInputMediaType)>();
-	logger->trace("IMFSinkWriter::SetInputMediaType: enter");
+	LOG->trace("IMFSinkWriter::SetInputMediaType: enter");
 	auto hr = original_func(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
-	logger->trace("IMFSinkWriter::SetInputMediaType: exit {}", hr);
+	LOG->trace("IMFSinkWriter::SetInputMediaType: exit {}", hr);
 	if (SUCCEEDED(hr)) {
 		GUID major_type = { 0 };
 		auto hr2 = pInputMediaType->GetMajorType(&major_type);
 		if (FAILED(hr2)) {
-			logger->error("failed to get major type for stream at index {}", dwStreamIndex);
+			LOG->error("failed to get major type for stream at index {}", dwStreamIndex);
 		}
 		else if (major_type == MFMediaType_Audio) {
 			audio_info = GetAudioInfo(dwStreamIndex, pInputMediaType);
@@ -215,7 +215,7 @@ STDAPI SinkWriterSetInputMediaType(
 			video_info = GetVideoInfo(dwStreamIndex, pInputMediaType);
 		}
 		else {
-			logger->debug("unknown stream at index {}", dwStreamIndex);
+			LOG->debug("unknown stream at index {}", dwStreamIndex);
 		}
 	}
 	LOG_EXIT;
@@ -234,13 +234,13 @@ DWORD WriteSample(IMFSample *sample, std::unique_ptr<FileHandle> & os) {
 	}
 	if (SUCCEEDED(hr))
 	{
-		logger->debug("writing {} bytes", buffer_length);
+		LOG->debug("writing {} bytes", buffer_length);
 		DWORD num_bytes_written = 0;
 		if (!WriteFile(os->Handle(), (const char *)p_buffer, buffer_length, &num_bytes_written, NULL)) {
-			logger->error("writing failed");
+			LOG->error("writing failed");
 		}
 		if (num_bytes_written != buffer_length) {
-			logger->error("only written {} bytes out of {} bytes", num_bytes_written, buffer_length);
+			LOG->error("only written {} bytes out of {} bytes", num_bytes_written, buffer_length);
 		}
 		hr = p_media_buffer->Unlock();
 	}
@@ -258,13 +258,13 @@ STDAPI SinkWriterWriteSample(
 	// we don't need to call the original
 	/*
 	if (!writesample_hook) {
-		logger->error("IMFSinkWriter::WriteSample hook not set up");
+		LOG->error("IMFSinkWriter::WriteSample hook not set up");
 		return E_FAIL;
 	}
 	auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
-	logger->trace("IMFSinkWriter::WriteSample: enter");
+	LOG->trace("IMFSinkWriter::WriteSample: enter");
 	auto hr = original_func(pThis, dwStreamIndex, pSample);
-	logger->trace("IMFSinkWriter::WriteSample: exit {}", hr);
+	LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
 	*/
 	if (audio_info) {
 		if (dwStreamIndex == audio_info->stream_index) {
@@ -285,16 +285,16 @@ STDAPI SinkWriterFinalize(
 {
 	LOG_ENTER;
 	if (!finalize_hook) {
-		logger->error("IMFSinkWriter::Finalize hook not set up");
+		LOG->error("IMFSinkWriter::Finalize hook not set up");
 		return E_FAIL;
 	}
 	auto original_func = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>();
-	logger->trace("IMFSinkWriter::Finalize: enter");
+	LOG->trace("IMFSinkWriter::Finalize: enter");
 	auto hr = original_func(pThis);
-	logger->trace("IMFSinkWriter::Finalize: exit {}", hr);
+	LOG->trace("IMFSinkWriter::Finalize: exit {}", hr);
 	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 	UnhookVFuncDetours();
-	logger->info("export finished");
+	LOG->info("export finished");
 	LOG_EXIT;
 	return hr;
 }
@@ -307,16 +307,16 @@ STDAPI CreateSinkWriterFromURL(
 	)
 {
 	LOG_ENTER;
-	logger->info("export started");
+	LOG->info("export started");
 	if (!sinkwriter_hook) {
-		logger->error("MFCreateSinkWriterFromURL hook not set up");
+		LOG->error("MFCreateSinkWriterFromURL hook not set up");
 		LOG_EXIT;
 		return E_FAIL;
 	}
 	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
-	logger->trace("MFCreateSinkWriterFromURL: enter");
+	LOG->trace("MFCreateSinkWriterFromURL: enter");
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
-	logger->trace("MFCreateSinkWriterFromURL: exit {}", hr);
+	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	settings.reset(new Settings);
 	if (!settings->output_folder_.empty()) {
 		/* mod enabled; update hooks on success */
@@ -327,7 +327,7 @@ STDAPI CreateSinkWriterFromURL(
 		}
 	} else {
 		/* mod disabled; inform user and remove all hooks */
-		logger->info("mod disabled due to empty output_folder");
+		LOG->info("mod disabled due to empty output_folder");
 		UnhookVFuncDetours();
 	}
 	LOG_EXIT;

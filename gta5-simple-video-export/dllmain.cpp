@@ -29,7 +29,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		/* clean up settings */
 		settings = nullptr;
 		/* clean up logger */
-		if (logger) LOG_EXIT;
+		LOG_EXIT;
 		logger = nullptr;
 		spdlog::drop(SCRIPT_NAME);
 		break;
