@@ -258,18 +258,19 @@ STDAPI CreateSinkWriterFromURL(
 	LOG->trace("MFCreateSinkWriterFromURL: enter");
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
 	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
+	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
-	if (!settings->output_folder_.empty()) {
-		/* mod enabled; update hooks on success */
-		if (SUCCEEDED(hr)) {
-			setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
-			writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
-			finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
-		}
-	} else {
-		/* mod disabled; inform user and remove all hooks */
-		LOG->info("mod disabled due to empty output_folder");
+	if (!settings->enable_) {
+		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();
+	}
+	else if (FAILED(hr)) {
+		LOG->info("MFCreateSinkWriterFromURL failed");
+		UnhookVFuncDetours();
+	} else {
+		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
+		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
+		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}
 	LOG_EXIT;
 	return hr;

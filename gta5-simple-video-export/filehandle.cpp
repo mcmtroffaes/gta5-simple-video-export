@@ -9,15 +9,14 @@ FileHandle::FileHandle() : handle_(INVALID_HANDLE_VALUE), path_() {};
 
 FileHandle::FileHandle(const std::string & filename) : FileHandle() {
 	LOG_ENTER;
-	if (settings && !settings->output_folder_.empty()) {
+	if (settings) {
 		char path[MAX_PATH] = "";
-		if (PathCombineA(path, settings->output_folder_.c_str(), filename.c_str()) == nullptr) {
-			LOG->error("could not combine {} and {} to form path of output stream", settings->output_folder_, filename);
+		if (PathCombineA(path, settings->raw_folder_.c_str(), filename.c_str()) == nullptr) {
+			LOG->error("could not combine {} and {} to form path of output stream", settings->raw_folder_, filename);
 		}
 		else {
 			path_ = path;
-			std::string pipe_prefix = "\\\\.\\pipe\\";
-			if (path_.substr(0, pipe_prefix.length()) == pipe_prefix) {
+			if (settings->IsRawFolderPipe()) {
 				LOG->info("opening pipe {} for writing", path_);
 				handle_ = CreateNamedPipeA(path_.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
 				if (!IsValid()) {

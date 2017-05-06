@@ -2,13 +2,13 @@
 #include "logger.h"
 #include "../ini-parser/ini.hpp"
 
-bool convert(const std::string & value_str, std::string & value)
+bool Convert(const std::string & value_str, std::string & value)
 {
 	value = value_str;
 	return true;
 }
 
-bool convert(const std::string & value_str, bool & value) {
+bool Convert(const std::string & value_str, bool & value) {
 	if (value_str == "true") {
 		value = true;
 		return true;
@@ -22,7 +22,7 @@ bool convert(const std::string & value_str, bool & value) {
 	}
 }
 
-bool convert(const std::string & value_str, spdlog::level::level_enum & value) {
+bool Convert(const std::string & value_str, spdlog::level::level_enum & value) {
 	if (value_str == "trace") {
 		value = spdlog::level::trace;
 		return true;
@@ -55,26 +55,45 @@ bool convert(const std::string & value_str, spdlog::level::level_enum & value) {
 }
 
 template <typename T>
-bool parse(const INI::Level & level, const std::string & name, T & value)
+bool Parse(const INI::Level *level, const std::string & name, T & value)
 {
 	LOG_ENTER;
 	auto success = false;
-	auto keyvalue = level.values.find(name);
-	if (keyvalue == level.values.end()) {
-		LOG->debug("{} not set", name);
+	if (!level) {
+		LOG->debug("value {} not found", name);
 	}
 	else {
-		auto value_str = keyvalue->second;
-		success = convert(value_str, value);
-		if (success) {
-			LOG->debug("{} = {}", name, value_str);
+		auto keyvalue = level->values.find(name);
+		if (keyvalue == level->values.end()) {
+			LOG->debug("value {} not found", name);
 		}
 		else {
-			LOG->error("{} = parse error ({})", name, value_str);
+			auto value_str = keyvalue->second;
+			success = Convert(value_str, value);
+			if (success) {
+				LOG->debug("{} = {}", name, value_str);
+			}
+			else {
+				LOG->error("{} = parse error ({})", name, value_str);
+			}
 		}
 	}
 	LOG_EXIT;
 	return success;
+}
+
+const INI::Level *GetSection(const INI::Level & parent, const std::string & name) {
+	LOG_ENTER;
+	auto keyvalue = parent.sections.find(name);
+	if (keyvalue != parent.sections.end()) {
+		LOG_EXIT;
+		return &keyvalue->second;
+	}
+	else {
+		LOG->error("section {} not found", name);
+		LOG_EXIT;
+		return nullptr;
+	}
 }
 
 BOOL DirectoryExists(LPCSTR szPath)
@@ -86,13 +105,19 @@ BOOL DirectoryExists(LPCSTR szPath)
 const std::string Settings::ini_filename_ = SCRIPT_FOLDER "\\config.ini";
 
 Settings::Settings()
-	: log_level_(spdlog::level::info)
+	: enable_(true)
+	, log_level_(spdlog::level::info)
 	, log_flush_on_(spdlog::level::off)
-	, output_folder_()
+	, raw_folder_("${gamefolder}\\" SCRIPT_FOLDER) // TODO: default to "\\\\.\\pipe\\" instead
+	, raw_video_filename_("sve-${timestamp}-video.yuv")
+	, raw_audio_filename_("sve-${timestamp}-audio.raw")
+	, client_executable_("${gamefolder}\\" SCRIPT_FOLDER "\\ffmpeg.exe")
+	, client_args_() // TODO: default to high quality mp4 export
 {
 	LOG_ENTER;
 	std::unique_ptr<INI::Parser> parser = nullptr;
 	try {
+		LOG->debug("parsing {}", ini_filename_);
 		parser.reset(new INI::Parser(ini_filename_.c_str()));
 	}
 	catch (const std::exception & ex) {
@@ -102,19 +127,39 @@ Settings::Settings()
 		LOG->error("{} unknown parse error", ini_filename_);
 	}
 	if (parser) {
-		parse(parser->top(), "log_level", log_level_);
-		parse(parser->top(), "log_flush_on", log_flush_on_);
+		// always parse the [log] section first (even if mod is disabled)
+		auto section_log = GetSection(parser->top(), "log");
+		Parse(section_log, "level", log_level_);
+		Parse(section_log, "flush_on", log_flush_on_);
 		LOG->set_level(settings->log_level_);
 		LOG->flush_on(settings->log_flush_on_);
-		if (parse(parser->top(), "output_folder", output_folder_)) {
-			if (!DirectoryExists(output_folder_.c_str())) {
-				LOG->error("output_folder {} does not exist", output_folder_);
-				output_folder_ = "";
+		// now parse everything else
+		Parse(&parser->top(), "enable", enable_);
+		auto section_raw = GetSection(parser->top(), "raw");
+		if (Parse(section_raw, "folder", raw_folder_)) {
+			if (raw_folder_ != "\\\\.\\pipe\\" && !DirectoryExists(raw_folder_.c_str())) {
+				LOG->error("folder {} does not exist; using " SCRIPT_FOLDER, raw_folder_);
+				raw_folder_ = SCRIPT_FOLDER;
 			}
 		}
-		else {
-			LOG->error("no output_folder specified in {}", ini_filename_);
-		}
+		Parse(section_raw, "video_filename", raw_video_filename_);
+		Parse(section_raw, "audio_filename", raw_audio_filename_);
+		auto section_client = GetSection(parser->top(), "client");
+		Parse(section_client, "executable", client_executable_);
+		std::vector<std::string> args(10);
+		Parse(section_client, "args0", args[0]);
+		Parse(section_client, "args1", args[1]);
+		Parse(section_client, "args2", args[2]);
+		Parse(section_client, "args3", args[3]);
+		Parse(section_client, "args4", args[4]);
+		Parse(section_client, "args5", args[5]);
+		Parse(section_client, "args6", args[6]);
+		Parse(section_client, "args7", args[7]);
+		Parse(section_client, "args8", args[8]);
+		Parse(section_client, "args9", args[9]);
+		std::ostringstream all_args;
+		std::copy(args.begin(), args.end(), std::ostream_iterator<std::string>(all_args, " "));
+		client_args_ = all_args.str();
 	}
 	LOG_EXIT;
 }
