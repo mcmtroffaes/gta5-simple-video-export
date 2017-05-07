@@ -202,7 +202,7 @@ STDAPI CreateSinkWriterFromURL(
 	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
-	info.reset(new GeneralInfo);
+	info.reset(new GeneralInfo(*settings));
 	if (!settings->enable_) {
 		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();

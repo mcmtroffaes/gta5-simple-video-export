@@ -13,10 +13,12 @@
 
 class GeneralInfo {
 private:
-	std::string scriptfolder_;
+	std::string documentsfolder_;
+	std::string videosfolder_;
+	std::string exportfolder_;
 	std::string timestamp_;
 public:
-	GeneralInfo();
+	GeneralInfo(const Settings & settings);
 	void Substitute(std::string & str) const;
 };
 

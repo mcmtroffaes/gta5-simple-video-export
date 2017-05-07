@@ -16,6 +16,7 @@ handles to the files for writing the actual raw uncompressed data.
 #include <iomanip>
 #include <sstream>
 
+#include <ShlObj.h> // SHGetKnownFolderPath
 #include <Shlwapi.h> // PathCombine
 #pragma comment(lib, "Shlwapi.lib")
 
@@ -78,15 +79,27 @@ void StringReplace(std::string & str, const std::string & old_str, uint32_t new_
 	LOG_EXIT;
 }
 
-std::string ScriptFolder()
+std::string UTF8Encode(const std::wstring & wstr)
 {
-	LOG_ENTER;
-	char buffer[MAX_PATH];
-	GetModuleFileNameA(NULL, buffer, MAX_PATH);
-	std::string::size_type pos = std::string(buffer).find_last_of("\\/");
-	auto path = MakePath(std::string(buffer).substr(0, pos), SCRIPT_FOLDER);
-	LOG_EXIT;
-	return path;
+	if (wstr.empty()) return std::string();
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+	std::string result(size_needed, 0);
+	WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &result[0], size_needed, NULL, NULL);
+	return result;
+}
+
+std::string GetKnownFolder(const KNOWNFOLDERID & fldrid)
+{
+	PWSTR path = NULL;
+	auto hr = SHGetKnownFolderPath(fldrid, 0, NULL, &path);
+	if (SUCCEEDED(hr)) {
+		auto path2 = UTF8Encode(path);
+		CoTaskMemFree(path);
+		return path2;
+	}
+	else {
+		return std::string();
+	}
 }
 
 std::string TimeStamp()
@@ -108,15 +121,20 @@ bool DirectoryExists(const std::string & path)
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-GeneralInfo::GeneralInfo()
-	: scriptfolder_(ScriptFolder())
+GeneralInfo::GeneralInfo(const Settings & settings)
+	: documentsfolder_(GetKnownFolder(FOLDERID_Documents))
+	, videosfolder_(GetKnownFolder(FOLDERID_Videos))
+	, exportfolder_(settings.exportfolder_)
 	, timestamp_(TimeStamp())
 {
+	Substitute(exportfolder_);
 }
 
 void GeneralInfo::Substitute(std::string & str) const {
 	LOG_ENTER;
-	StringReplace(str, "${scriptfolder}", scriptfolder_);
+	StringReplace(str, "${documentsfolder}", documentsfolder_);
+	StringReplace(str, "${videosfolder}", videosfolder_);
+	StringReplace(str, "${exportfolder}", exportfolder_);
 	StringReplace(str, "${timestamp}", timestamp_);
 	LOG_EXIT;
 };

@@ -14,7 +14,9 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		logger = nullptr;
 		settings.reset(new Settings);
 		/* set up logger */
-		logger = spdlog::basic_logger_st(SCRIPT_NAME, SCRIPT_FOLDER "\\log.txt");
+		logger = spdlog::rotating_logger_st(
+			SCRIPT_NAME, SCRIPT_NAME ".log",
+			settings->log_max_file_size_, settings->log_max_files_);
 		if (!logger) break;
 		logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [thread %t] [%l] %v");
 		logger->set_level(settings->log_level_);
@@ -22,7 +24,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		LOG_ENTER;
 		/* set up hooks */
 		Hook();
-		LOG->info(SCRIPT_NAME " attached");
+		LOG->info(SCRIPT_NAME " started");
 		break;
 	case DLL_PROCESS_DETACH:
 		/* clean up hooks */
@@ -30,7 +32,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		/* clean up settings */
 		settings = nullptr;
 		/* clean up logger */
-		LOG->info(SCRIPT_NAME " detached");
+		LOG->info(SCRIPT_NAME " stopped");
 		LOG_EXIT;
 		logger = nullptr;
 		spdlog::drop(SCRIPT_NAME);

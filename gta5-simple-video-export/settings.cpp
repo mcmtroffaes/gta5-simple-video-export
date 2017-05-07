@@ -8,6 +8,16 @@ bool Convert(const std::string & value_str, std::string & value)
 	return true;
 }
 
+bool Convert(const std::string & value_str, unsigned long & value) {
+	try {
+		value = std::stoul(value_str);
+	}
+	catch (...) {
+		return false;
+	}
+	return true;
+}
+
 bool Convert(const std::string & value_str, bool & value) {
 	if (value_str == "true") {
 		value = true;
@@ -97,21 +107,24 @@ const INI::Level *GetSection(const INI::Level & parent, const std::string & name
 	}
 }
 
-const std::string Settings::ini_filename_ = SCRIPT_FOLDER "\\config.ini";
+const std::string Settings::ini_filename_ = SCRIPT_NAME ".ini";
 
 Settings::Settings()
 // note: default settings here must match the default config.ini that is shipped
 	: enable_(true)
+	, exportfolder_("${videosfolder}")
 	, log_level_(spdlog::level::info)
 	, log_flush_on_(spdlog::level::off)
-	, raw_folder_("${scriptfolder}")
+	, log_max_file_size_(10000000)
+	, log_max_files_(5)
+	, raw_folder_("${exportfolder}")
 	, raw_video_filename_("sve-${timestamp}-video.yuv")
 	, raw_audio_filename_("sve-${timestamp}-audio.raw")
-	, client_batchfile_("${scriptfolder}\\sve-${timestamp}-client.bat")
-	, client_executable_("${scriptfolder}\\ffmpeg.exe")
-	, client_args_() // TODO: set up default
-	, videoformats_()
+	, client_batchfile_("${exportfolder}\\sve-${timestamp}.bat")
+	, client_executable_("${exportfolder}\\ffmpeg.exe")
+	, client_args_()
 	, audioformats_()
+	, videoformats_()
 {
 	LOG_ENTER;
 	std::unique_ptr<INI::Parser> parser = nullptr;
@@ -130,10 +143,13 @@ Settings::Settings()
 		auto section_log = GetSection(parser->top(), "log");
 		Parse(section_log, "level", log_level_);
 		Parse(section_log, "flush_on", log_flush_on_);
+		Parse(section_log, "max_file_size", log_max_file_size_);
+		Parse(section_log, "max_files", log_max_files_);
 		LOG->set_level(settings->log_level_);
 		LOG->flush_on(settings->log_flush_on_);
 		// now parse everything else
 		Parse(&parser->top(), "enable", enable_);
+		Parse(&parser->top(), "exportfolder", exportfolder_);
 		auto section_raw = GetSection(parser->top(), "raw");
 		Parse(section_raw, "folder", raw_folder_);
 		Parse(section_raw, "video_filename", raw_video_filename_);
