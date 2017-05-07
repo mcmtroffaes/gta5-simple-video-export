@@ -6,7 +6,7 @@ reloaded. It just stores the timestamp and the game folder.
 
 AudioInfo and VideoInfo are created when the audio and video input formats are
 set. They store all relevant information about the format. They also store the
-handles to the files (or pipes) for writing the actual raw uncompressed data.
+handles to the files for writing the actual raw uncompressed data.
 */
 
 #include "info.h"
@@ -21,10 +21,6 @@ handles to the files (or pipes) for writing the actual raw uncompressed data.
 
 auto MakePath(const std::string & part1, const std::string & part2) {
 	LOG_ENTER;
-	if (part1 == "\\\\.\\pipe\\") {
-		LOG_EXIT;
-		return part1 + part2;
-	};
 	char path[MAX_PATH] = "";
 	if (PathCombineA(path, part1.c_str(), part2.c_str()) == nullptr) {
 		LOG->error("could not combine {} and {} to form path of output stream", part1, part2);
@@ -108,13 +104,8 @@ std::string TimeStamp()
 
 bool DirectoryExists(const std::string & path)
 {
-	if (path == "\\\\.\\pipe\\") {
-		return true;
-	}
-	else {
-		DWORD dwAttrib = GetFileAttributesA(path.c_str());
-		return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-	}
+	DWORD dwAttrib = GetFileAttributesA(path.c_str());
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
 GeneralInfo::GeneralInfo()
@@ -180,7 +171,7 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	}
 	if (SUCCEEDED(hr)) {
 		LOG->info("audio bits per sample = {}", audio_bits_per_sample_);
-		os_.reset(new FileHandle(audio_path_, settings.IsRawFolderPipe()));
+		os_.reset(new FileHandle(audio_path_));
 	}
 	LOG_EXIT;
 }
@@ -237,7 +228,7 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	}
 	if (SUCCEEDED(hr)) {
 		LOG->info("video framerate = {}/{}", framerate_numerator_, framerate_denominator_);
-		os_.reset(new FileHandle(video_path_, settings.IsRawFolderPipe()));
+		os_.reset(new FileHandle(video_path_));
 	}
 	LOG_EXIT;
 }

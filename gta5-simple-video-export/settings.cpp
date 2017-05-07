@@ -104,7 +104,7 @@ Settings::Settings()
 	: enable_(true)
 	, log_level_(spdlog::level::info)
 	, log_flush_on_(spdlog::level::off)
-	, raw_folder_("${scriptfolder}") // TODO: default to "\\\\.\\pipe\\" instead
+	, raw_folder_("${scriptfolder}")
 	, raw_video_filename_("sve-${timestamp}-video.yuv")
 	, raw_audio_filename_("sve-${timestamp}-audio.raw")
 	, client_batchfile_("${scriptfolder}\\sve-${timestamp}-client.bat")

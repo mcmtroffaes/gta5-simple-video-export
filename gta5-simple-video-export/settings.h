@@ -21,7 +21,6 @@ public:
 	std::map<std::string, std::string> videoformats_;
 	std::map<std::string, std::string> audioformats_;
 	Settings();
-	bool IsRawFolderPipe() const { return raw_folder_ == "\\\\.\\pipe\\"; };
 };
 
 /* declaration resides in dllmain.cpp */

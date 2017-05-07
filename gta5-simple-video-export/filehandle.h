@@ -6,7 +6,7 @@
 class FileHandle {
 public:
 	FileHandle();
-	FileHandle(const std::string & path, bool pipe);
+	FileHandle(const std::string & path);
 	~FileHandle();
 	bool IsValid() const;
 	HANDLE Handle() const;
