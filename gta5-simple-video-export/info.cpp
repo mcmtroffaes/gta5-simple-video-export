@@ -261,7 +261,7 @@ void CreateClientBatchFile(const Settings & settings, const GeneralInfo & info, 
 	audio_info.Substitute(batchfile);
 	video_info.Substitute(batchfile);
 	LOG->info("creating {}; run this file to process the raw output", batchfile);
-	std::ofstream os(settings.client_batchfile_, std::ios::out | std::ios::trunc);
+	std::ofstream os(batchfile, std::ios::out | std::ios::trunc);
 	os << "@echo off" << std::endl;
 	os << '"' << executable << '"' << ' ' << args << std::endl;
 	os << "pause" << std::endl;
