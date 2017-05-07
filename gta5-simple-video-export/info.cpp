@@ -81,23 +81,29 @@ void StringReplace(std::string & str, const std::string & old_str, uint32_t new_
 
 std::string UTF8Encode(const std::wstring & wstr)
 {
+	LOG_ENTER;
 	if (wstr.empty()) return std::string();
 	int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
 	std::string result(size_needed, 0);
 	WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &result[0], size_needed, NULL, NULL);
+	LOG_EXIT;
 	return result;
 }
 
 std::string GetKnownFolder(const KNOWNFOLDERID & fldrid)
 {
+	LOG_ENTER;
 	PWSTR path = NULL;
 	auto hr = SHGetKnownFolderPath(fldrid, 0, NULL, &path);
 	if (SUCCEEDED(hr)) {
 		auto path2 = UTF8Encode(path);
 		CoTaskMemFree(path);
+		LOG_EXIT;
 		return path2;
 	}
 	else {
+		LOG->error("failed to get known folder");
+		LOG_EXIT;
 		return std::string();
 	}
 }
@@ -127,7 +133,9 @@ GeneralInfo::GeneralInfo(const Settings & settings)
 	, exportfolder_(settings.exportfolder_)
 	, timestamp_(TimeStamp())
 {
+	LOG_ENTER;
 	Substitute(exportfolder_);
+	LOG_EXIT;
 }
 
 void GeneralInfo::Substitute(std::string & str) const {
@@ -195,11 +203,13 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 }
 
 void AudioInfo::Substitute(std::string & str) const {
+	LOG_ENTER;
 	StringReplace(str, "${audio_format}", audio_format_);
 	StringReplace(str, "${audio_path}", audio_path_);
 	StringReplace(str, "${audio_rate}", audio_rate_);
 	StringReplace(str, "${audio_num_channels}", audio_num_channels_);
 	StringReplace(str, "${audio_bits_per_sample}", audio_bits_per_sample_);
+	LOG_EXIT;
 }
 
 VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const Settings & settings, const GeneralInfo & info)
@@ -252,12 +262,14 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 }
 
 void VideoInfo::Substitute(std::string & str) const {
+	LOG_ENTER;
 	StringReplace(str, "${video_format}", video_format_);
 	StringReplace(str, "${video_path}", video_path_);
 	StringReplace(str, "${width}", width_);
 	StringReplace(str, "${height}", height_);
 	StringReplace(str, "${framerate_numerator}", framerate_numerator_);
 	StringReplace(str, "${framerate_denominator}", framerate_denominator_);
+	LOG_EXIT;
 }
 
 void CreateClientBatchFile(const Settings & settings, const GeneralInfo & info, const AudioInfo & audio_info, const VideoInfo & video_info)
