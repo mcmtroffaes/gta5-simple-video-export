@@ -101,7 +101,18 @@ STDAPI SinkWriterBeginWriting(
 	if (settings && info && audio_info && video_info) {
 		CreateClientBatchFile(*settings, *info, *audio_info, *video_info);
 		if (settings->IsRawFolderPipe()) {
-			// TODO run client command and wait for audio and video pipes to be connected
+			// wait for audio and video pipes to be connected
+			// this will block the game until the user starts the batch file
+			LOG->info("waiting for client batch file to be started so pipes can be connected");
+			if (!ConnectNamedPipe(audio_info->os_->Handle(), NULL)) {
+				LOG->error("failed to connect audio pipe (GLE = {})", GetLastError());
+			}
+			else if (!ConnectNamedPipe(video_info->os_->Handle(), NULL)) {
+				LOG->error("failed to connect video pipe (GLE = {})", GetLastError());
+			}
+			else {
+				LOG->info("audio and video pipes connected");
+			}
 		}
 	}
 	LOG_EXIT;

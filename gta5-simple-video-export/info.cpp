@@ -21,6 +21,10 @@ handles to the files (or pipes) for writing the actual raw uncompressed data.
 
 auto MakePath(const std::string & part1, const std::string & part2) {
 	LOG_ENTER;
+	if (part1 == "\\\\.\\pipe\\") {
+		LOG_EXIT;
+		return part1 + part2;
+	};
 	char path[MAX_PATH] = "";
 	if (PathCombineA(path, part1.c_str(), part2.c_str()) == nullptr) {
 		LOG->error("could not combine {} and {} to form path of output stream", part1, part2);
