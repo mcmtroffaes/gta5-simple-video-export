@@ -178,16 +178,6 @@ STDAPI SinkWriterFinalize(
 	LOG->trace("IMFSinkWriter::Finalize: enter");
 	auto hr = original_func(pThis);
 	LOG->trace("IMFSinkWriter::Finalize: exit {}", hr);
-	/* client command */
-	if (settings && info && audio_info && video_info) {
-		std::string executable = settings->client_executable_;
-		info->Substitute(executable);
-		std::string args = settings->client_args_;
-		info->Substitute(args);
-		audio_info->Substitute(args);
-		video_info->Substitute(args);
-		LOG->info("{} {}", executable, args);
-	}
 	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 	UnhookVFuncDetours();
 	LOG->info("export finished");
