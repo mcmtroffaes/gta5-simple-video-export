@@ -105,14 +105,16 @@ BOOL DirectoryExists(LPCSTR szPath)
 const std::string Settings::ini_filename_ = SCRIPT_FOLDER "\\config.ini";
 
 Settings::Settings()
+// note: default settings here must match the default config.ini that is shipped
 	: enable_(true)
 	, log_level_(spdlog::level::info)
 	, log_flush_on_(spdlog::level::off)
-	, raw_folder_("${gamefolder}\\" SCRIPT_FOLDER) // TODO: default to "\\\\.\\pipe\\" instead
+	, raw_folder_("${scriptfolder}") // TODO: default to "\\\\.\\pipe\\" instead
 	, raw_video_filename_("sve-${timestamp}-video.yuv")
 	, raw_audio_filename_("sve-${timestamp}-audio.raw")
-	, client_executable_("${gamefolder}\\" SCRIPT_FOLDER "\\ffmpeg.exe")
-	, client_args_() // TODO: default to high quality mp4 export
+	, client_batchfile_("${scriptfolder}\sve-${timestamp}-client.bat")
+	, client_executable_("${scriptfolder}\\ffmpeg.exe")
+	, client_args_() // TODO: set up default
 {
 	LOG_ENTER;
 	std::unique_ptr<INI::Parser> parser = nullptr;
@@ -145,6 +147,7 @@ Settings::Settings()
 		Parse(section_raw, "video_filename", raw_video_filename_);
 		Parse(section_raw, "audio_filename", raw_audio_filename_);
 		auto section_client = GetSection(parser->top(), "client");
+		Parse(section_client, "batchfile", client_batchfile_);
 		Parse(section_client, "executable", client_executable_);
 		std::vector<std::string> args(10);
 		Parse(section_client, "args0", args[0]);
@@ -160,6 +163,7 @@ Settings::Settings()
 		std::ostringstream all_args;
 		std::copy(args.begin(), args.end(), std::ostream_iterator<std::string>(all_args, " "));
 		client_args_ = all_args.str();
+		LOG->debug("all args = {}", client_args_);
 	}
 	LOG_EXIT;
 }

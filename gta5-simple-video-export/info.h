@@ -13,7 +13,7 @@
 
 class GeneralInfo {
 private:
-	std::string gamefolder_;
+	std::string scriptfolder_;
 	std::string timestamp_;
 public:
 	GeneralInfo();
@@ -48,3 +48,5 @@ public:
 	VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const Settings & settings, const GeneralInfo & info);
 	void Substitute(std::string & str) const;
 };
+
+void CreateClientBatchFile(const Settings & settings, const GeneralInfo & info, const AudioInfo & audio_info, const VideoInfo & video_info);

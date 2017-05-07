@@ -1,11 +1,33 @@
+/*
+Manage information during the export process.
+
+Info is created at the very start of the export, right after the ini file is
+reloaded. It just stores the timestamp and the game folder.
+
+AudioInfo and VideoInfo are created when the audio and video input formats are
+set. They store all relevant information about the format. They also store the
+handles to the files (or pipes) for writing the actual raw uncompressed data.
+*/
+
 #include "info.h"
 
-#include <iomanip>
 #include <ctime>
+#include <fstream>
+#include <iomanip>
 #include <sstream>
 
 #include <Shlwapi.h> // PathCombine
 #pragma comment(lib, "Shlwapi.lib")
+
+auto MakePath(const std::string & part1, const std::string & part2) {
+	LOG_ENTER;
+	char path[MAX_PATH] = "";
+	if (PathCombineA(path, part1.c_str(), part2.c_str()) == nullptr) {
+		LOG->error("could not combine {} and {} to form path of output stream", part1, part2);
+	}
+	LOG_EXIT;
+	return std::string(path);
+}
 
 template <typename T>
 std::string ToString(const T & value) {
@@ -15,11 +37,13 @@ std::string ToString(const T & value) {
 }
 
 std::string GUIDToString(const GUID & guid) {
+	LOG_ENTER;
 	char buffer[48];
 	snprintf(buffer, sizeof(buffer), "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
 		guid.Data1, guid.Data2, guid.Data3,
 		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
 		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+	LOG_EXIT;
 	return std::string(buffer);
 }
 
@@ -30,12 +54,13 @@ void StringReplace(std::string & str, const std::string & old_str, const std::st
 	if (!new_str.empty()) {
 		std::string::size_type pos = 0;
 		while ((pos = str.find(old_str, pos)) != std::string::npos) {
-			LOG->debug("replacing \"{}\" by \"{}\" in \"{}\"", old_str, new_str, str);
+			// we have a lot of these messages; so use trace instead of debug
+			LOG->trace("replacing \"{}\" by \"{}\" in \"{}\"", old_str, new_str, str);
 			str.replace(pos, old_str.length(), new_str);
 			pos += new_str.length();
 		}
 	}
-	else if (str.find(old_str, 0) != std::string::npos) {
+	else if (str.find(old_str) != std::string::npos) {
 		LOG->error("cannot replace \"{}\" in \"{}\" as its value is not yet identified", old_str, str);
 	}
 	LOG_EXIT;
@@ -53,42 +78,41 @@ void StringReplace(std::string & str, const std::string & old_str, uint32_t new_
 	LOG_EXIT;
 }
 
-std::string GameFolder()
+std::string ScriptFolder()
 {
+	LOG_ENTER;
 	char buffer[MAX_PATH];
 	GetModuleFileNameA(NULL, buffer, MAX_PATH);
 	std::string::size_type pos = std::string(buffer).find_last_of("\\/");
-	return std::string(buffer).substr(0, pos);
+	auto path = MakePath(std::string(buffer).substr(0, pos), SCRIPT_FOLDER);
+	LOG_EXIT;
+	return path;
 }
 
 std::string TimeStamp()
 {
+	LOG_ENTER;
 	time_t rawtime;
 	struct tm timeinfo;
 	time(&rawtime);
 	localtime_s(&timeinfo, &rawtime);
 	std::ostringstream oss;
-	oss << std::put_time(&timeinfo, "%Y%d%m%H%M%S");
+	oss << std::put_time(&timeinfo, "%Y%d%m-%H%M%S");
+	LOG_EXIT;
 	return oss.str();
 }
 
-auto MakePath(const std::string & folder, const std::string & filename) {
-	char path[MAX_PATH] = "";
-	if (PathCombineA(path, folder.c_str(), filename.c_str()) == nullptr) {
-		LOG->error("could not combine {} and {} to form path of output stream", folder, filename);
-	}
-	return std::string(path);
-}
-
 GeneralInfo::GeneralInfo()
-	: gamefolder_(GameFolder())
+	: scriptfolder_(ScriptFolder())
 	, timestamp_(TimeStamp())
 {
 }
 
 void GeneralInfo::Substitute(std::string & str) const {
-	StringReplace(str, "${gamefolder}", gamefolder_);
+	LOG_ENTER;
+	StringReplace(str, "${scriptfolder}", scriptfolder_);
 	StringReplace(str, "${timestamp}", timestamp_);
+	LOG_EXIT;
 };
 
 AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const Settings & settings, const GeneralInfo & info)
@@ -194,4 +218,25 @@ void VideoInfo::Substitute(std::string & str) const {
 	StringReplace(str, "${height}", height_);
 	StringReplace(str, "${framerate_numerator}", framerate_numerator_);
 	StringReplace(str, "${framerate_denominator}", framerate_denominator_);
+}
+
+void CreateClientBatchFile(const Settings & settings, const GeneralInfo & info, const AudioInfo & audio_info, const VideoInfo & video_info)
+{
+	LOG_ENTER;
+	auto executable = settings.client_executable_;
+	info.Substitute(executable);
+	auto args = settings.client_args_;
+	info.Substitute(args);
+	audio_info.Substitute(args);
+	video_info.Substitute(args);
+	auto batchfile = settings.client_batchfile_;
+	info.Substitute(batchfile);
+	audio_info.Substitute(batchfile);
+	video_info.Substitute(batchfile);
+	LOG->info("creating {}; run this file to process the raw output", batchfile);
+	std::ofstream os(settings.client_batchfile_, std::ios::out | std::ios::trunc);
+	os << "@echo off" << std::endl;
+	os << '"' << executable << '"' << ' ' << args << std::endl;
+	os << "pause" << std::endl;
+	LOG_EXIT;
 }

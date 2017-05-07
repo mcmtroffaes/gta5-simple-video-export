@@ -1,3 +1,8 @@
+/*
+A simple wrapper around CreateFile and CreateNamedPipe, which automatically
+closes the handle.
+*/
+
 #include "filehandle.h"
 #include "logger.h"
 #include "settings.h"
@@ -12,13 +17,6 @@ FileHandle::FileHandle(const std::string & path, bool pipe) : FileHandle() {
 		handle_ = CreateNamedPipeA(path_.c_str(), PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 0, 0, 0, NULL);
 		if (!IsValid()) {
 			LOG->error("failed to create pipe");
-		}
-		else {
-			if (!ConnectNamedPipe(handle_, NULL)) {
-				LOG->error("failed to make connection on pipe");
-				CloseHandle(handle_); // close the pipe
-				handle_ = INVALID_HANDLE_VALUE;
-			}
 		}
 	}
 	else {

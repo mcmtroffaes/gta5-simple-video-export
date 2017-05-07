@@ -18,6 +18,7 @@ using namespace Microsoft::WRL;
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> setinputmediatype_hook = nullptr;
+std::unique_ptr<PLH::VFuncDetour> beginwriting_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
@@ -28,6 +29,7 @@ void UnhookVFuncDetours()
 {
 	LOG_ENTER;
 	setinputmediatype_hook = nullptr;
+	beginwriting_hook = nullptr;
 	writesample_hook = nullptr;
 	finalize_hook = nullptr;
 	audio_info = nullptr;
@@ -78,6 +80,28 @@ STDAPI SinkWriterSetInputMediaType(
 		}
 		else {
 			LOG->debug("unknown stream at index {}", dwStreamIndex);
+		}
+	}
+	LOG_EXIT;
+	return hr;
+}
+
+STDAPI SinkWriterBeginWriting(
+	IMFSinkWriter *pThis)
+{
+	LOG_ENTER;
+	if (!beginwriting_hook) {
+		LOG->error("IMFSinkWriter::BeginWriting hook not set up");
+		return E_FAIL;
+	}
+	auto original_func = beginwriting_hook->GetOriginal<decltype(&SinkWriterBeginWriting)>();
+	LOG->trace("IMFSinkWriter::BeginWriting: enter");
+	auto hr = original_func(pThis);
+	LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
+	if (settings && info && audio_info && video_info) {
+		CreateClientBatchFile(*settings, *info, *audio_info, *video_info);
+		if (settings->IsRawFolderPipe()) {
+			// TODO run client command and wait for audio and video pipes to be connected
 		}
 	}
 	LOG_EXIT;
@@ -201,6 +225,7 @@ STDAPI CreateSinkWriterFromURL(
 		UnhookVFuncDetours();
 	} else {
 		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
+		beginwriting_hook = CreateVFuncDetour(*ppSinkWriter, 5, &SinkWriterBeginWriting);
 		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}

@@ -15,6 +15,7 @@ public:
 	std::string raw_folder_;
 	std::string raw_video_filename_;
 	std::string raw_audio_filename_;
+	std::string client_batchfile_;
 	std::string client_executable_;
 	std::string client_args_;
 	Settings();
