@@ -102,6 +102,17 @@ std::string TimeStamp()
 	return oss.str();
 }
 
+bool DirectoryExists(const std::string & path)
+{
+	if (path == "\\\\.\\pipe\\") {
+		return true;
+	}
+	else {
+		DWORD dwAttrib = GetFileAttributesA(path.c_str());
+		return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	}
+}
+
 GeneralInfo::GeneralInfo()
 	: scriptfolder_(ScriptFolder())
 	, timestamp_(TimeStamp())
@@ -133,12 +144,18 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	info.Substitute(filename);
 	audio_path_ = MakePath(folder, filename);
 	LOG->debug("audio path = {}", audio_path_);
+	auto hr = DirectoryExists(folder) ? S_OK : E_FAIL;
+	if (FAILED(hr)) {
+		LOG->error("folder {} does not exist", folder);
+	}
 	GUID subtype = { 0 };
-	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
+	if (SUCCEEDED(hr)) {
+		hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
+	}
 	if (SUCCEEDED(hr)) {
 		auto guid_str = GUIDToString(subtype);
-		auto format = settings.videoformats_.find(guid_str);
-		if (format != settings.videoformats_.end()) {
+		auto format = settings.audioformats_.find(guid_str);
+		if (format != settings.audioformats_.end()) {
 			audio_format_ = format->second;
 			LOG->info("audio format = {} = {}", guid_str, audio_format_);
 			hr = input_media_type.GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &audio_rate_);
@@ -190,8 +207,12 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	info.Substitute(filename);
 	video_path_ = MakePath(folder, filename);
 	LOG->debug("video path = {}", video_path_);
+	auto hr = DirectoryExists(folder) ? S_OK : E_FAIL;
+	if (FAILED(hr)) {
+		LOG->error("folder {} does not exist", folder);
+	}
 	GUID subtype = { 0 };
-	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
+	hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
 		auto guid_str = GUIDToString(subtype);
 		auto format = settings.videoformats_.find(guid_str);

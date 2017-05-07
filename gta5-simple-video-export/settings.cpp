@@ -84,22 +84,17 @@ bool Parse(const INI::Level *level, const std::string & name, T & value)
 
 const INI::Level *GetSection(const INI::Level & parent, const std::string & name) {
 	LOG_ENTER;
+	LOG->debug("parsing section [{}]", name);
 	auto keyvalue = parent.sections.find(name);
 	if (keyvalue != parent.sections.end()) {
 		LOG_EXIT;
 		return &keyvalue->second;
 	}
 	else {
-		LOG->error("section {} not found", name);
+		LOG->error("section [{}] not found", name);
 		LOG_EXIT;
 		return nullptr;
 	}
-}
-
-BOOL DirectoryExists(LPCSTR szPath)
-{
-	DWORD dwAttrib = GetFileAttributesA(szPath);
-	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
 const std::string Settings::ini_filename_ = SCRIPT_FOLDER "\\config.ini";
@@ -112,7 +107,7 @@ Settings::Settings()
 	, raw_folder_("${scriptfolder}") // TODO: default to "\\\\.\\pipe\\" instead
 	, raw_video_filename_("sve-${timestamp}-video.yuv")
 	, raw_audio_filename_("sve-${timestamp}-audio.raw")
-	, client_batchfile_("${scriptfolder}\sve-${timestamp}-client.bat")
+	, client_batchfile_("${scriptfolder}\\sve-${timestamp}-client.bat")
 	, client_executable_("${scriptfolder}\\ffmpeg.exe")
 	, client_args_() // TODO: set up default
 	, videoformats_()
@@ -140,12 +135,7 @@ Settings::Settings()
 		// now parse everything else
 		Parse(&parser->top(), "enable", enable_);
 		auto section_raw = GetSection(parser->top(), "raw");
-		if (Parse(section_raw, "folder", raw_folder_)) {
-			if (raw_folder_ != "\\\\.\\pipe\\" && !DirectoryExists(raw_folder_.c_str())) {
-				LOG->error("folder {} does not exist; using " SCRIPT_FOLDER, raw_folder_);
-				raw_folder_ = SCRIPT_FOLDER;
-			}
-		}
+		Parse(section_raw, "folder", raw_folder_);
 		Parse(section_raw, "video_filename", raw_video_filename_);
 		Parse(section_raw, "audio_filename", raw_audio_filename_);
 		auto section_client = GetSection(parser->top(), "client");
