@@ -136,13 +136,16 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	GUID subtype = { 0 };
 	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
-		if (subtype == MFAudioFormat_PCM) {
-			audio_format_ = "s16le";
-			LOG->info("audio format = PCM {}", GUIDToString(subtype));
+		auto guid_str = GUIDToString(subtype);
+		auto format = settings.videoformats_.find(guid_str);
+		if (format != settings.videoformats_.end()) {
+			audio_format_ = format->second;
+			LOG->info("audio format = {} = {}", guid_str, audio_format_);
 			hr = input_media_type.GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &audio_rate_);
 		}
 		else {
-			LOG->error("audio format unsupported");
+			LOG->error("audio format = {} = unsupported", guid_str);
+			LOG->error("please add an entry for audio format {} in {}", guid_str, settings.ini_filename_);
 			hr = E_FAIL;
 		}
 	}
@@ -190,13 +193,16 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	GUID subtype = { 0 };
 	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (SUCCEEDED(hr)) {
-		if (subtype == MFVideoFormat_NV12) {
-			video_format_ = "nv12";
-			LOG->info("video format = NV12 {}", GUIDToString(subtype));
+		auto guid_str = GUIDToString(subtype);
+		auto format = settings.videoformats_.find(guid_str);
+		if (format != settings.videoformats_.end()) {
+			video_format_ = format->second;
+			LOG->info("video format = {} = {}", guid_str, video_format_);
 			hr = MFGetAttributeSize(&input_media_type, MF_MT_FRAME_SIZE, &width_, &height_);
 		}
 		else {
-			LOG->error("video format unsupported");
+			LOG->error("video format = {} = unsupported", guid_str);
+			LOG->error("please add an entry for video format {} in {}", guid_str, settings.ini_filename_);
 			hr = E_FAIL;
 		}
 	}
@@ -238,5 +244,6 @@ void CreateClientBatchFile(const Settings & settings, const GeneralInfo & info, 
 	os << "@echo off" << std::endl;
 	os << '"' << executable << '"' << ' ' << args << std::endl;
 	os << "pause" << std::endl;
+	os.close();
 	LOG_EXIT;
 }

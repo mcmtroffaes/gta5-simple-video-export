@@ -115,6 +115,8 @@ Settings::Settings()
 	, client_batchfile_("${scriptfolder}\sve-${timestamp}-client.bat")
 	, client_executable_("${scriptfolder}\\ffmpeg.exe")
 	, client_args_() // TODO: set up default
+	, videoformats_()
+	, audioformats_()
 {
 	LOG_ENTER;
 	std::unique_ptr<INI::Parser> parser = nullptr;
@@ -164,6 +166,14 @@ Settings::Settings()
 		std::copy(args.begin(), args.end(), std::ostream_iterator<std::string>(all_args, " "));
 		client_args_ = all_args.str();
 		LOG->debug("all args = {}", client_args_);
+		auto section_audioformats = GetSection(parser->top(), "audioformats");
+		if (section_audioformats) {
+			audioformats_ = section_audioformats->values;
+		}
+		auto section_videoformats = GetSection(parser->top(), "videoformats");
+		if (section_videoformats) {
+			videoformats_ = section_videoformats->values;
+		}
 	}
 	LOG_EXIT;
 }
