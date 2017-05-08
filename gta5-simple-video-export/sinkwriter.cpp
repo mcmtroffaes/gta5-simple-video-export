@@ -23,7 +23,7 @@ std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
-std::unique_ptr<GeneralInfo> info = nullptr;
+std::unique_ptr<Info> info = nullptr;
 
 void UnhookVFuncDetours()
 {
@@ -64,7 +64,13 @@ STDAPI SinkWriterSetInputMediaType(
 	LOG->trace("IMFSinkWriter::SetInputMediaType: exit {}", hr);
 	if (SUCCEEDED(hr)) {
 		GUID major_type = { 0 };
-		auto hr2 = pInputMediaType->GetMajorType(&major_type);
+		auto hr2 = pInputMediaType ? S_OK : E_FAIL;
+		if (FAILED(hr2)) {
+			LOG->error("input media type pointer is null");
+		}
+		else {
+			hr2 = pInputMediaType->GetMajorType(&major_type);
+		}
 		if (FAILED(hr2)) {
 			LOG->error("failed to get major type for stream at index {}", dwStreamIndex);
 		}
@@ -149,14 +155,14 @@ STDAPI SinkWriterWriteSample(
 	auto hr = original_func(pThis, dwStreamIndex, pSample);
 	LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
 	*/
-	if (audio_info && audio_info->os_ && audio_info->os_->IsValid()) {
+	if (audio_info && audio_info->handle_ && audio_info->handle_->IsValid()) {
 		if (dwStreamIndex == audio_info->stream_index_) {
-			WriteSample(pSample, audio_info->os_->Handle());
+			WriteSample(pSample, audio_info->handle_->Handle());
 		}
 	}
-	if (video_info && video_info->os_ && video_info->os_->IsValid()) {
+	if (video_info && video_info->handle_ && video_info->handle_->IsValid()) {
 		if (dwStreamIndex == video_info->stream_index_) {
-			WriteSample(pSample, video_info->os_->Handle());
+			WriteSample(pSample, video_info->handle_->Handle());
 		}
 	}
 	LOG_EXIT;
@@ -202,7 +208,7 @@ STDAPI CreateSinkWriterFromURL(
 	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
-	info.reset(new GeneralInfo(*settings));
+	info.reset(new Info(*settings));
 	if (!settings->enable_) {
 		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();

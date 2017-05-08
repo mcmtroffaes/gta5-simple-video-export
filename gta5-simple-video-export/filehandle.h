@@ -1,3 +1,8 @@
+/*
+A simple wrapper around CreateFile, which automatically closes the handle,
+and which logs when a file is created and closed.
+*/
+
 #pragma once
 
 #include <windows.h>

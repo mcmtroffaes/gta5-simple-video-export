@@ -1,14 +1,3 @@
-/*
-Manage information during the export process.
-
-Info is created at the very start of the export, right after the ini file is
-reloaded. It just stores the timestamp and the game folder.
-
-AudioInfo and VideoInfo are created when the audio and video input formats are
-set. They store all relevant information about the format. They also store the
-handles to the files for writing the actual raw uncompressed data.
-*/
-
 #include "info.h"
 
 #include <ctime>
@@ -74,18 +63,19 @@ void StringReplace(std::string & str, const std::string & old_str, uint32_t new_
 		StringReplace(str, old_str, ToString(new_value));
 	}
 	else {
-		StringReplace(str, old_str, "");
+		StringReplace(str, old_str, std::string());
 	}
 	LOG_EXIT;
 }
 
+// taken from http://stackoverflow.com/a/3999597
 std::string UTF8Encode(const std::wstring & wstr)
 {
 	LOG_ENTER;
 	if (wstr.empty()) return std::string();
-	int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
-	std::string result(size_needed, 0);
-	WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &result[0], size_needed, NULL, NULL);
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL,       0,           NULL, NULL);
+	std::string result(size_needed, '\0');
+	WideCharToMultiByte(                  CP_UTF8, 0, &wstr[0], (int)wstr.size(), &result[0], size_needed, NULL, NULL);
 	LOG_EXIT;
 	return result;
 }
@@ -127,7 +117,7 @@ bool DirectoryExists(const std::string & path)
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-GeneralInfo::GeneralInfo(const Settings & settings)
+Info::Info(const Settings & settings)
 	: documentsfolder_(GetKnownFolder(FOLDERID_Documents))
 	, videosfolder_(GetKnownFolder(FOLDERID_Videos))
 	, exportfolder_(settings.exportfolder_)
@@ -138,7 +128,7 @@ GeneralInfo::GeneralInfo(const Settings & settings)
 	LOG_EXIT;
 }
 
-void GeneralInfo::Substitute(std::string & str) const {
+void Info::Substitute(std::string & str) const {
 	LOG_ENTER;
 	StringReplace(str, "${documentsfolder}", documentsfolder_);
 	StringReplace(str, "${videosfolder}", videosfolder_);
@@ -147,14 +137,14 @@ void GeneralInfo::Substitute(std::string & str) const {
 	LOG_EXIT;
 };
 
-AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const Settings & settings, const GeneralInfo & info)
+AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const Settings & settings, const Info & info)
 	: audio_format_()
 	, audio_path_()
 	, audio_rate_(UINT32_MAX)
 	, audio_num_channels_(UINT32_MAX)
 	, audio_bits_per_sample_(UINT32_MAX)
 	, stream_index_(stream_index)
-	, os_(nullptr)
+	, handle_(nullptr)
 {
 	LOG_ENTER;
 	stream_index_ = stream_index;
@@ -197,7 +187,7 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	}
 	if (SUCCEEDED(hr)) {
 		LOG->info("audio bits per sample = {}", audio_bits_per_sample_);
-		os_.reset(new FileHandle(audio_path_));
+		handle_.reset(new FileHandle(audio_path_));
 	}
 	LOG_EXIT;
 }
@@ -212,7 +202,7 @@ void AudioInfo::Substitute(std::string & str) const {
 	LOG_EXIT;
 }
 
-VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const Settings & settings, const GeneralInfo & info)
+VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const Settings & settings, const Info & info)
 	: video_format_()
 	, video_path_()
 	, width_(UINT32_MAX)
@@ -220,7 +210,7 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	, framerate_numerator_(UINT32_MAX)
 	, framerate_denominator_(UINT32_MAX)
 	, stream_index_(stream_index)
-	, os_(nullptr)
+	, handle_(nullptr)
 {
 	LOG_ENTER;
 	LOG->debug("video stream index = {}", stream_index_);
@@ -256,7 +246,7 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	}
 	if (SUCCEEDED(hr)) {
 		LOG->info("video framerate = {}/{}", framerate_numerator_, framerate_denominator_);
-		os_.reset(new FileHandle(video_path_));
+		handle_.reset(new FileHandle(video_path_));
 	}
 	LOG_EXIT;
 }
@@ -272,11 +262,13 @@ void VideoInfo::Substitute(std::string & str) const {
 	LOG_EXIT;
 }
 
-void CreateClientBatchFile(const Settings & settings, const GeneralInfo & info, const AudioInfo & audio_info, const VideoInfo & video_info)
+void CreateClientBatchFile(const Settings & settings, const Info & info, const AudioInfo & audio_info, const VideoInfo & video_info)
 {
 	LOG_ENTER;
 	auto executable = settings.client_executable_;
 	info.Substitute(executable);
+	audio_info.Substitute(executable);
+	video_info.Substitute(executable);
 	auto args = settings.client_args_;
 	info.Substitute(args);
 	audio_info.Substitute(args);

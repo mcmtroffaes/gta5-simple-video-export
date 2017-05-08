@@ -1,10 +1,5 @@
-/*
-A simple wrapper around CreateFile, which automatically closes the handle.
-*/
-
 #include "filehandle.h"
 #include "logger.h"
-#include "settings.h"
 
 FileHandle::FileHandle() : handle_(INVALID_HANDLE_VALUE), path_() {};
 

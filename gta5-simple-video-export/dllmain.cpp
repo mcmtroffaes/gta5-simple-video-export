@@ -1,3 +1,19 @@
+/*
+Main entry point for attaching and detaching the mod.
+
+Attach:
+
+1. Get all settings from the ini file.
+2. Set up the logger with corresponding settings.
+3. Hook MFCreateSinkWriterFromURL.
+
+Detach:
+
+1. Unhook MFCreateSinkWriterFromURL.
+2. Clean up settings
+3. Clean up logger.
+*/
+
 #include "sinkwriter.h"
 #include "logger.h"
 #include "settings.h"
