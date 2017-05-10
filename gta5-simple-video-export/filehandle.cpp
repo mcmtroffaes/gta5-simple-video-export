@@ -3,11 +3,11 @@
 
 FileHandle::FileHandle() : handle_(INVALID_HANDLE_VALUE), path_() {};
 
-FileHandle::FileHandle(const std::string & path) : FileHandle() {
+FileHandle::FileHandle(const std::wstring & path) : FileHandle() {
 	LOG_ENTER;
 	path_ = path;
-	LOG->info("opening file {} for writing", path_);
-	handle_ = CreateFileA(path_.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	LOG->info("opening file {} for writing", wstring_to_utf8(path_));
+	handle_ = CreateFileW(path_.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!IsValid()) {
 		LOG->error("failed to create file");
 	}
@@ -17,7 +17,7 @@ FileHandle::FileHandle(const std::string & path) : FileHandle() {
 FileHandle::~FileHandle() {
 	LOG_ENTER;
 	if (IsValid()) {
-		LOG->info("closing {}", path_);
+		LOG->info("closing {}", wstring_to_utf8(path_));
 		CloseHandle(handle_);
 	}
 	LOG_EXIT;
@@ -32,7 +32,7 @@ HANDLE FileHandle::Handle() const {
 	return handle_;
 }
 
-const std::string & FileHandle::Path() const
+const std::wstring & FileHandle::Path() const
 {
 	return path_;
 }

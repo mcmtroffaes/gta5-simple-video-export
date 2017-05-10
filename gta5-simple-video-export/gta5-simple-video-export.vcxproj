@@ -22,6 +22,7 @@
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="filehandle.cpp" />
     <ClCompile Include="info.cpp" />
+    <ClCompile Include="logger.cpp" />
     <ClCompile Include="settings.cpp" />
     <ClCompile Include="sinkwriter.cpp" />
   </ItemGroup>

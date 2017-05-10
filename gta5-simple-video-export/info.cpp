@@ -9,84 +9,72 @@
 #include <Shlwapi.h> // PathCombine
 #pragma comment(lib, "Shlwapi.lib")
 
-auto MakePath(const std::string & part1, const std::string & part2) {
+auto MakePath(const std::wstring & part1, const std::wstring & part2) {
 	LOG_ENTER;
-	char path[MAX_PATH] = "";
-	if (PathCombineA(path, part1.c_str(), part2.c_str()) == nullptr) {
-		LOG->error("could not combine {} and {} to form path of output stream", part1, part2);
+	wchar_t path[MAX_PATH] = L"";
+	if (PathCombineW(path, part1.c_str(), part2.c_str()) == nullptr) {
+		LOG->error("could not combine {} and {} to form path of output stream", wstring_to_utf8(part1), wstring_to_utf8(part2));
 	}
 	LOG_EXIT;
-	return std::string(path);
+	return std::wstring(path);
 }
 
 template <typename T>
-std::string ToString(const T & value) {
-	std::ostringstream oss;
+std::wstring ToString(const T & value) {
+	std::wostringstream oss;
 	oss << value;
 	return oss.str();
 }
 
-std::string GUIDToString(const GUID & guid) {
+std::wstring GUIDToString(const GUID & guid) {
 	LOG_ENTER;
-	char buffer[48];
-	snprintf(buffer, sizeof(buffer), "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
+	wchar_t buffer[48];
+	_snwprintf_s(buffer, sizeof(buffer), L"%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
 		guid.Data1, guid.Data2, guid.Data3,
 		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
 		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 	LOG_EXIT;
-	return std::string(buffer);
+	return std::wstring(buffer);
 }
 
-void StringReplace(std::string & str, const std::string & old_str, const std::string & new_str)
+void StringReplace(std::wstring & str, const std::wstring & old_str, const std::wstring & new_str)
 {
 	LOG_ENTER;
 	// empty string represents an uninitialized value
 	if (!new_str.empty()) {
-		std::string::size_type pos = 0;
-		while ((pos = str.find(old_str, pos)) != std::string::npos) {
+		std::wstring::size_type pos = 0;
+		while ((pos = str.find(old_str, pos)) != std::wstring::npos) {
 			// we have a lot of these messages; so use trace instead of debug
-			LOG->trace("replacing \"{}\" by \"{}\" in \"{}\"", old_str, new_str, str);
+			LOG->trace("replacing \"{}\" by \"{}\" in \"{}\"", wstring_to_utf8(old_str), wstring_to_utf8(new_str), wstring_to_utf8(str));
 			str.replace(pos, old_str.length(), new_str);
 			pos += new_str.length();
 		}
 	}
-	else if (str.find(old_str) != std::string::npos) {
-		LOG->error("cannot replace \"{}\" in \"{}\" as its value is not yet identified", old_str, str);
+	else if (str.find(old_str) != std::wstring::npos) {
+		LOG->error("cannot replace \"{}\" in \"{}\" as its value is not yet identified", wstring_to_utf8(old_str), wstring_to_utf8(str));
 	}
 	LOG_EXIT;
 }
 
-void StringReplace(std::string & str, const std::string & old_str, uint32_t new_value) {
+void StringReplace(std::wstring & str, const std::wstring & old_str, uint32_t new_value) {
 	LOG_ENTER;
 	// max represents an uninitialized value
 	if (new_value != UINT32_MAX) {
 		StringReplace(str, old_str, ToString(new_value));
 	}
 	else {
-		StringReplace(str, old_str, std::string());
+		StringReplace(str, old_str, std::wstring());
 	}
 	LOG_EXIT;
 }
 
-// taken from http://stackoverflow.com/a/3999597
-std::string UTF8Encode(const std::wstring & wstr)
-{
-	LOG_ENTER;
-	if (wstr.empty()) return std::string();
-	int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL,       0,           NULL, NULL);
-	std::string result(size_needed, '\0');
-	WideCharToMultiByte(                  CP_UTF8, 0, &wstr[0], (int)wstr.size(), &result[0], size_needed, NULL, NULL);
-	LOG_EXIT;
-	return result;
-}
-
-std::string GetKnownFolder(const KNOWNFOLDERID & fldrid)
+std::wstring GetKnownFolder(const KNOWNFOLDERID & fldrid)
 {
 	LOG_ENTER;
 	PWSTR path = NULL;
 	auto hr = SHGetKnownFolderPath(fldrid, 0, NULL, &path);
 	if (SUCCEEDED(hr)) {
-		auto path2 = UTF8Encode(path);
+		auto path2 = std::wstring(path);
 		CoTaskMemFree(path);
 		LOG_EXIT;
 		return path2;
@@ -94,26 +82,26 @@ std::string GetKnownFolder(const KNOWNFOLDERID & fldrid)
 	else {
 		LOG->error("failed to get known folder");
 		LOG_EXIT;
-		return std::string();
+		return std::wstring();
 	}
 }
 
-std::string TimeStamp()
+std::wstring TimeStamp()
 {
 	LOG_ENTER;
 	time_t rawtime;
 	struct tm timeinfo;
 	time(&rawtime);
 	localtime_s(&timeinfo, &rawtime);
-	std::ostringstream oss;
-	oss << std::put_time(&timeinfo, "%Y%d%m-%H%M%S");
+	std::wostringstream oss;
+	oss << std::put_time(&timeinfo, L"%Y%d%m-%H%M%S");
 	LOG_EXIT;
 	return oss.str();
 }
 
-bool DirectoryExists(const std::string & path)
+bool DirectoryExists(const std::wstring & path)
 {
-	DWORD dwAttrib = GetFileAttributesA(path.c_str());
+	DWORD dwAttrib = GetFileAttributesW(path.c_str());
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
@@ -128,12 +116,12 @@ Info::Info(const Settings & settings)
 	LOG_EXIT;
 }
 
-void Info::Substitute(std::string & str) const {
+void Info::Substitute(std::wstring & str) const {
 	LOG_ENTER;
-	StringReplace(str, "${documentsfolder}", documentsfolder_);
-	StringReplace(str, "${videosfolder}", videosfolder_);
-	StringReplace(str, "${exportfolder}", exportfolder_);
-	StringReplace(str, "${timestamp}", timestamp_);
+	StringReplace(str, L"${documentsfolder}", documentsfolder_);
+	StringReplace(str, L"${videosfolder}", videosfolder_);
+	StringReplace(str, L"${exportfolder}", exportfolder_);
+	StringReplace(str, L"${timestamp}", timestamp_);
 	LOG_EXIT;
 };
 
@@ -154,10 +142,10 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	info.Substitute(folder);
 	info.Substitute(filename);
 	audio_path_ = MakePath(folder, filename);
-	LOG->debug("audio path = {}", audio_path_);
+	LOG->debug("audio path = {}", wstring_to_utf8(audio_path_));
 	auto hr = DirectoryExists(folder) ? S_OK : E_FAIL;
 	if (FAILED(hr)) {
-		LOG->error("folder {} does not exist", folder);
+		LOG->error("folder {} does not exist", wstring_to_utf8(folder));
 	}
 	GUID subtype = { 0 };
 	if (SUCCEEDED(hr)) {
@@ -168,12 +156,12 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 		auto format = settings.audioformats_.find(guid_str);
 		if (format != settings.audioformats_.end()) {
 			audio_format_ = format->second;
-			LOG->info("audio format = {} = {}", guid_str, audio_format_);
+			LOG->info("audio format = {} = {}", wstring_to_utf8(guid_str), wstring_to_utf8(audio_format_));
 			hr = input_media_type.GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &audio_rate_);
 		}
 		else {
-			LOG->error("audio format = {} = unsupported", guid_str);
-			LOG->error("please add an entry for audio format {} in {}", guid_str, settings.ini_filename_);
+			LOG->error("audio format = {} = unsupported", wstring_to_utf8(guid_str));
+			LOG->error("please add an entry for audio format {} in {}", wstring_to_utf8(guid_str), wstring_to_utf8(settings.ini_filename_));
 			hr = E_FAIL;
 		}
 	}
@@ -192,13 +180,13 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	LOG_EXIT;
 }
 
-void AudioInfo::Substitute(std::string & str) const {
+void AudioInfo::Substitute(std::wstring & str) const {
 	LOG_ENTER;
-	StringReplace(str, "${audio_format}", audio_format_);
-	StringReplace(str, "${audio_path}", audio_path_);
-	StringReplace(str, "${audio_rate}", audio_rate_);
-	StringReplace(str, "${audio_num_channels}", audio_num_channels_);
-	StringReplace(str, "${audio_bits_per_sample}", audio_bits_per_sample_);
+	StringReplace(str, L"${audio_format}", audio_format_);
+	StringReplace(str, L"${audio_path}", audio_path_);
+	StringReplace(str, L"${audio_rate}", audio_rate_);
+	StringReplace(str, L"${audio_num_channels}", audio_num_channels_);
+	StringReplace(str, L"${audio_bits_per_sample}", audio_bits_per_sample_);
 	LOG_EXIT;
 }
 
@@ -219,10 +207,10 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	info.Substitute(folder);
 	info.Substitute(filename);
 	video_path_ = MakePath(folder, filename);
-	LOG->debug("video path = {}", video_path_);
+	LOG->debug("video path = {}", wstring_to_utf8(video_path_));
 	auto hr = DirectoryExists(folder) ? S_OK : E_FAIL;
 	if (FAILED(hr)) {
-		LOG->error("folder {} does not exist", folder);
+		LOG->error("folder {} does not exist", wstring_to_utf8(folder));
 	}
 	GUID subtype = { 0 };
 	hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
@@ -231,12 +219,12 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 		auto format = settings.videoformats_.find(guid_str);
 		if (format != settings.videoformats_.end()) {
 			video_format_ = format->second;
-			LOG->info("video format = {} = {}", guid_str, video_format_);
+			LOG->info("video format = {} = {}", wstring_to_utf8(guid_str), wstring_to_utf8(video_format_));
 			hr = MFGetAttributeSize(&input_media_type, MF_MT_FRAME_SIZE, &width_, &height_);
 		}
 		else {
-			LOG->error("video format = {} = unsupported", guid_str);
-			LOG->error("please add an entry for video format {} in {}", guid_str, settings.ini_filename_);
+			LOG->error("video format = {} = unsupported", wstring_to_utf8(guid_str));
+			LOG->error("please add an entry for video format {} in {}", wstring_to_utf8(guid_str), wstring_to_utf8(settings.ini_filename_));
 			hr = E_FAIL;
 		}
 	}
@@ -251,14 +239,14 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type, const 
 	LOG_EXIT;
 }
 
-void VideoInfo::Substitute(std::string & str) const {
+void VideoInfo::Substitute(std::wstring & str) const {
 	LOG_ENTER;
-	StringReplace(str, "${video_format}", video_format_);
-	StringReplace(str, "${video_path}", video_path_);
-	StringReplace(str, "${width}", width_);
-	StringReplace(str, "${height}", height_);
-	StringReplace(str, "${framerate_numerator}", framerate_numerator_);
-	StringReplace(str, "${framerate_denominator}", framerate_denominator_);
+	StringReplace(str, L"${video_format}", video_format_);
+	StringReplace(str, L"${video_path}", video_path_);
+	StringReplace(str, L"${width}", width_);
+	StringReplace(str, L"${height}", height_);
+	StringReplace(str, L"${framerate_numerator}", framerate_numerator_);
+	StringReplace(str, L"${framerate_denominator}", framerate_denominator_);
 	LOG_EXIT;
 }
 
@@ -277,11 +265,11 @@ void CreateClientBatchFile(const Settings & settings, const Info & info, const A
 	info.Substitute(batchfile);
 	audio_info.Substitute(batchfile);
 	video_info.Substitute(batchfile);
-	LOG->info("creating {}; run this file to process the raw output", batchfile);
-	std::ofstream os(batchfile, std::ios::out | std::ios::trunc);
-	os << "@echo off" << std::endl;
-	os << '"' << executable << '"' << ' ' << args << std::endl;
-	os << "pause" << std::endl;
+	LOG->info("creating {}; run this file to process the raw output", wstring_to_utf8(batchfile));
+	std::wofstream os(batchfile, std::ios::out | std::ios::trunc);
+	os << L"@echo off" << std::endl;
+	os << L'"' << executable << L'"' << L' ' << args << std::endl;
+	os << L"pause" << std::endl;
 	os.close();
 	LOG_EXIT;
 }
