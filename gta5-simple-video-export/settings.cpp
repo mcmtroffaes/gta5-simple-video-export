@@ -5,6 +5,8 @@
 #include <fstream>
 #include <sstream>
 
+typedef inipp::Ini<wchar_t> Ini;
+
 bool Convert(const std::wstring & value_str, std::wstring & value)
 {
 	value = value_str;
@@ -68,7 +70,7 @@ bool Convert(const std::wstring & value_str, spdlog::level::level_enum & value) 
 }
 
 template <typename T>
-bool Parse(const inipp::wini_reader::Section & level, const std::wstring & name, T & value)
+bool Parse(const Ini::Section & level, const std::wstring & name, T & value)
 {
 	LOG_ENTER;
 	auto success = false;
@@ -90,7 +92,7 @@ bool Parse(const inipp::wini_reader::Section & level, const std::wstring & name,
 	return success;
 }
 
-const inipp::wini_reader::Section & GetSection(const inipp::wini_reader & ini, const std::wstring & name) {
+const Ini::Section & GetSection(const Ini & ini, const std::wstring & name) {
 	LOG_ENTER;
 	LOG->debug("parsing section [{}]", wstring_to_utf8(name));
 	auto keyvalue = ini.sections.find(name);
@@ -101,7 +103,7 @@ const inipp::wini_reader::Section & GetSection(const inipp::wini_reader & ini, c
 	else {
 		LOG->error("section [{}] not found", wstring_to_utf8(name));
 		LOG_EXIT;
-		return inipp::wini_reader::Section();
+		return Ini::Section();
 	}
 }
 
@@ -125,10 +127,10 @@ Settings::Settings()
 	, videoformats_()
 {
 	LOG_ENTER;
-	std::unique_ptr<inipp::wini_reader> ini = nullptr;
+	std::unique_ptr<Ini> ini = nullptr;
 	LOG->debug("parsing {}", wstring_to_utf8(ini_filename_));
 	std::wifstream is(ini_filename_);
-	ini.reset(new inipp::wini_reader);
+	ini.reset(new Ini);
 	ini->parse(is);
 	if (!ini->errors.empty()) {
 		for (auto error : ini->errors) {
