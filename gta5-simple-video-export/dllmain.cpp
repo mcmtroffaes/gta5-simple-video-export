@@ -30,13 +30,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		logger = nullptr;
 		settings.reset(new Settings);
 		/* set up logger */
-		logger = spdlog::rotating_logger_st(
-			SCRIPT_NAME, SCRIPT_NAME ".log",
-			settings->log_max_file_size_, settings->log_max_files_);
-		if (!logger) break;
-		logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [thread %t] [%l] %v");
-		logger->set_level(settings->log_level_);
-		logger->flush_on(settings->log_flush_on_);
+		settings->ResetLogger();
 		LOG_ENTER;
 		/* set up hooks */
 		Hook();

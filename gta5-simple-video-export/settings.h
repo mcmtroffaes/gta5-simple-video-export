@@ -1,28 +1,37 @@
 #pragma once
 
-#include "../spdlog/include/spdlog/spdlog.h"
+#include "logger.h"
+#include <inipp.h>
 
 #define SCRIPT_NAME "SimpleVideoExport"
 
-class Settings
+class Settings : public inipp::Ini<wchar_t>
 {
 public:
 	static const std::wstring ini_filename_;
-	bool enable_;
-	std::wstring exportfolder_;
-	spdlog::level::level_enum log_level_;
-	spdlog::level::level_enum log_flush_on_;
-	unsigned long log_max_file_size_;
-	unsigned long log_max_files_;
-	std::wstring raw_folder_;
-	std::wstring raw_video_filename_;
-	std::wstring raw_audio_filename_;
-	std::wstring client_batchfile_;
-	std::wstring client_executable_;
-	std::wstring client_args_;
-	std::map<std::wstring, std::wstring> audioformats_;
-	std::map<std::wstring, std::wstring> videoformats_;
 	Settings();
+	void ResetLogger();
+
+	const Section & GetSec(const std::wstring & sec_name) const;
+
+	template <typename T>
+	bool GetVar(const Section & sec, const std::wstring & var_name, T & value) const
+	{
+		LOG_ENTER;
+		bool found = false;
+		auto var = sec.find(var_name);
+		if (var == sec.end()) {
+			LOG->warn("variable {} not found", wstring_to_utf8(var_name));
+		}
+		else {
+			found = inipp::extract(var->second, value);
+			if (!found) {
+				LOG->error("failed to parse {}", wstring_to_utf8(var->second));
+			}
+		}
+		return found;
+		LOG_EXIT;
+	}
 };
 
 /* declaration resides in dllmain.cpp */

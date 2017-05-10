@@ -23,7 +23,6 @@ std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
-std::unique_ptr<Info> info = nullptr;
 
 void UnhookVFuncDetours()
 {
@@ -34,7 +33,6 @@ void UnhookVFuncDetours()
 	finalize_hook = nullptr;
 	audio_info = nullptr;
 	video_info = nullptr;
-	info = nullptr;
 	LOG_EXIT;
 }
 
@@ -75,14 +73,10 @@ STDAPI SinkWriterSetInputMediaType(
 			LOG->error("failed to get major type for stream at index {}", dwStreamIndex);
 		}
 		else if (major_type == MFMediaType_Audio) {
-			if (settings && info) {
-				audio_info.reset(new AudioInfo(dwStreamIndex, *pInputMediaType, *settings, *info));
-			}
+			audio_info.reset(new AudioInfo(dwStreamIndex, *pInputMediaType));
 		}
 		else if (major_type == MFMediaType_Video) {
-			if (settings && info) {
-				video_info.reset(new VideoInfo(dwStreamIndex, *pInputMediaType, *settings, *info));
-			}
+			video_info.reset(new VideoInfo(dwStreamIndex, *pInputMediaType));
 		}
 		else {
 			LOG->debug("unknown stream at index {}", dwStreamIndex);
@@ -104,8 +98,24 @@ STDAPI SinkWriterBeginWriting(
 	LOG->trace("IMFSinkWriter::BeginWriting: enter");
 	auto hr = original_func(pThis);
 	LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
-	if (settings && info && audio_info && video_info) {
-		CreateClientBatchFile(*settings, *info, *audio_info, *video_info);
+	if (settings && audio_info && video_info) {
+		audio_info->UpdateSettings(*settings);
+		video_info->UpdateSettings(*settings);
+		std::wostringstream os;
+		settings->generate(os);
+		LOG->debug("settings before interpolation:\n{}", wstring_to_utf8(os.str()));
+		settings->interpolate();
+		os.str(L"");
+		settings->generate(os);
+		LOG->debug("settings after interpolation:\n{}", wstring_to_utf8(os.str()));
+		auto rawsec = settings->GetSec(L"raw");
+		std::wstring audio_filename{ };
+		std::wstring video_filename{ };
+		settings->GetVar(rawsec, L"audio_filename", audio_filename);
+		settings->GetVar(rawsec, L"video_filename", video_filename);
+		audio_info->handle_.reset(new FileHandle(audio_filename));
+		video_info->handle_.reset(new FileHandle(video_filename));
+		CreateBatchFile(*settings);
 	}
 	LOG_EXIT;
 	return hr;
@@ -208,8 +218,11 @@ STDAPI CreateSinkWriterFromURL(
 	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
-	info.reset(new Info(*settings));
-	if (!settings->enable_) {
+	settings->ResetLogger();
+	auto enable = true;
+	auto defsec = settings->GetSec(settings->default_section_name);
+	settings->GetVar(defsec, L"enable", enable);
+	if (!enable) {
 		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();
 	}
