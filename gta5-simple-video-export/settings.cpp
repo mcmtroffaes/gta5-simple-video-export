@@ -127,18 +127,17 @@ Settings::Settings()
 	, videoformats_()
 {
 	LOG_ENTER;
-	std::unique_ptr<Ini> ini = nullptr;
 	LOG->debug("parsing {}", wstring_to_utf8(ini_filename_));
 	std::wifstream is(ini_filename_);
-	ini.reset(new Ini);
-	ini->parse(is);
-	if (!ini->errors.empty()) {
-		for (auto error : ini->errors) {
+	Ini ini;
+	ini.parse(is);
+	if (!ini.errors.empty()) {
+		for (auto error : ini.errors) {
 			LOG->error("failed to parse \"{}\"", wstring_to_utf8(error));
 		}
 	}
 	// always parse the [log] section first (even if mod is disabled)
-	auto section_log = GetSection(*ini, L"log");
+	auto section_log = GetSection(ini, L"log");
 	Parse(section_log, L"level", log_level_);
 	Parse(section_log, L"flush_on", log_flush_on_);
 	Parse(section_log, L"max_file_size", log_max_file_size_);
@@ -146,14 +145,14 @@ Settings::Settings()
 	LOG->set_level(settings->log_level_);
 	LOG->flush_on(settings->log_flush_on_);
 	// now parse everything else
-	auto section_default = GetSection(*ini, L"DEFAULT");
+	auto section_default = GetSection(ini, L"DEFAULT");
 	Parse(section_default, L"enable", enable_);
 	Parse(section_default, L"exportfolder", exportfolder_);
-	auto section_raw = GetSection(*ini, L"raw");
+	auto section_raw = GetSection(ini, L"raw");
 	Parse(section_raw, L"folder", raw_folder_);
 	Parse(section_raw, L"video_filename", raw_video_filename_);
 	Parse(section_raw, L"audio_filename", raw_audio_filename_);
-	auto section_client = GetSection(*ini, L"client");
+	auto section_client = GetSection(ini, L"client");
 	Parse(section_client, L"batchfile", client_batchfile_);
 	Parse(section_client, L"executable", client_executable_);
 	std::vector<std::wstring> args(10);
@@ -171,7 +170,7 @@ Settings::Settings()
 	std::copy(args.begin(), args.end(), std::ostream_iterator<std::wstring, wchar_t>(all_args, L" "));
 	client_args_ = all_args.str();
 	LOG->debug("all args = {}", wstring_to_utf8(client_args_));
-	audioformats_ = GetSection(*ini, L"audioformats");
-	videoformats_ = GetSection(*ini, L"videoformats");
+	audioformats_ = GetSection(ini, L"audioformats");
+	videoformats_ = GetSection(ini, L"videoformats");
 	LOG_EXIT;
 }
