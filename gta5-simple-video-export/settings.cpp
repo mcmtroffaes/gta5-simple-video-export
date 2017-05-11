@@ -1,7 +1,7 @@
 #include "settings.h"
 #include "logger.h"
-#include "../inipp/inipp/inipp.h"
 
+#include <inipp.h>
 #include <fstream>
 #include <sstream>
 
