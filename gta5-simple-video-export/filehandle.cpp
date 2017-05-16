@@ -31,8 +31,3 @@ bool FileHandle::IsValid() const
 HANDLE FileHandle::Handle() const {
 	return handle_;
 }
-
-const std::wstring & FileHandle::Path() const
-{
-	return path_;
-}

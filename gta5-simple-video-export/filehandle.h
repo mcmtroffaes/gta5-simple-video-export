@@ -15,7 +15,6 @@ public:
 	~FileHandle();
 	bool IsValid() const;
 	HANDLE Handle() const;
-	const std::wstring & Path() const;
 private:
 	HANDLE handle_;
 	std::wstring path_;
