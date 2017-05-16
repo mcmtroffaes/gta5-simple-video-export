@@ -1,4 +1,26 @@
-/* hooks into media foundation's sink writer for intercepting video/audio data */
+/*
+Hooks into media foundation's sink writer for intercepting video/audio data.
+
+The main entry point is CreateSinkWriterFromURL. This reloads the ini file (so
+we always have the latest settings; coincidently this also updates the
+timestamp), checks if the mod is enabled, and sets up all the required
+SinkWriter hooks.
+
+Under normal circumstances, the game will then call SinkWriterSetInputMediaType
+twice, once for the audio, and once for the video. At this point, we intercept
+the audio and video information (resolution, format, ...).
+
+After that, the game will call SinkWriterBeginWriting. There, we propagate all
+the information gathered so far into the ini file (via UpdateSettings), we
+interpolate the ini file, we create the file handles that will contain the
+raw exported audio and video, and we create the batch file for post-processing.
+
+Next, the game will repeatedly call SinkWriterWriteSample. We intercept the
+raw data and write it to our own file handles.
+
+At the end of the export process, the game calls SinkWriterFinalize. There we
+unhook all the SinkWriter hooks (this will also close all files).
+*/
 
 #include "sinkwriter.h"
 #include "logger.h"

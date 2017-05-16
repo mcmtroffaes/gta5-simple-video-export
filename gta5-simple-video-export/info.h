@@ -1,18 +1,6 @@
 /*
 Classes to store information about the export.
 
-The information stored here is available to the user through variables in the
-ini file. Each class exposes a Substitute method to perform this variable
-substitution. Whenever some variable from the ini file is used, these
-Substitute methods are to be called.
-
-In the design, uninitialized values are represented by UINT32_MAX for integer
-variables, and by an empty string for string variables.
-
-Info stores general information available from the start of the export, such
-as timestamp, and various folder locations. This information is initialized in
-the CreateSinkWriterFromURL hook (search for "info.reset").
-
 AudioInfo stores information about the audio format (bit rate, number of
 channels, and so on). It also stores the handle to the raw audio file, and the
 media foundation stream index. This information is initialized in the
@@ -23,9 +11,17 @@ and so on). It also stores the handle to the raw video file, and the
 media foundation stream index. This information is initialized in the
 SinkWriterSetInputMediaType hook  (search for "video_info.reset").
 
-CreateClientBatchFile is a function that creates a batch file for converting
-the raw files to a compressed audio/video container file, using the command
-and arguments specified by the user in the ini file.
+Uninitialized values are represented by UINT32_MAX for integer
+variables.
+
+Each info class also has an UpdateSettings method, which exports the
+information to the DEFAULT section of the ini file. This happens in the
+SinkWriterBeginWriting hook, just before the ini file is interpolated (search
+for "settings->interpolate").
+
+CreateBatchFile is a function that creates a batch file for converting
+the raw files to a compressed audio/video container file, using the
+batch_command specified by the user in the ini file.
 */
 
 #pragma once
