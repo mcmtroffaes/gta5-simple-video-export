@@ -97,9 +97,9 @@ void Settings::ResetLogger() {
 			SCRIPT_NAME, SCRIPT_NAME ".log",
 			max_file_size, max_files);
 	}
-	logger->flush();
 	GetVar(sec, L"level", level);
 	GetVar(sec, L"flush_on", flush_on);
+	logger->flush();
 	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [thread %t] [%l] %v");
 	logger->set_level(level);
 	logger->flush_on(flush_on);
