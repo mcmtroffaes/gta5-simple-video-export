@@ -6,7 +6,6 @@ platform: x64
 configuration: Release
 build:
   project: gta5-simple-video-export.sln
-  verbosity: detailed
 after_build:
   - pushd x64\Release
   - ps: Copy-Item -Path "..\..\gta5-simple-video-export\*.ini" -Destination .
