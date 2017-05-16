@@ -141,6 +141,7 @@ DWORD WriteSample(IMFSample *sample, HANDLE handle) {
 		if (num_bytes_written != buffer_length) {
 			LOG->error("only written {} bytes out of {} bytes", num_bytes_written, buffer_length);
 		}
+		memset(p_buffer, 0, buffer_length); // clear sample so game will output blank video/audio
 		hr = p_media_buffer->Unlock();
 	}
 	return buffer_length;
@@ -154,17 +155,7 @@ STDAPI SinkWriterWriteSample(
 {
 	LOG_ENTER;
 	auto hr = S_OK;
-	// we don't need to call the original
-	/*
-	if (!writesample_hook) {
-		LOG->error("IMFSinkWriter::WriteSample hook not set up");
-		return E_FAIL;
-	}
-	auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
-	LOG->trace("IMFSinkWriter::WriteSample: enter");
-	auto hr = original_func(pThis, dwStreamIndex, pSample);
-	LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
-	*/
+	// write our audio or video sample; note: this will clear the sample as well
 	if (audio_info && audio_info->handle_ && audio_info->handle_->IsValid()) {
 		if (dwStreamIndex == audio_info->stream_index_) {
 			WriteSample(pSample, audio_info->handle_->Handle());
@@ -175,6 +166,15 @@ STDAPI SinkWriterWriteSample(
 			WriteSample(pSample, video_info->handle_->Handle());
 		}
 	}
+	// call original function
+	if (!writesample_hook) {
+		LOG->error("IMFSinkWriter::WriteSample hook not set up");
+		return E_FAIL;
+	}
+	auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
+	LOG->trace("IMFSinkWriter::WriteSample: enter");
+	hr = original_func(pThis, dwStreamIndex, pSample);
+	LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
 	LOG_EXIT;
 	return hr;
 }
