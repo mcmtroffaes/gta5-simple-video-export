@@ -7,66 +7,35 @@
 
 typedef inipp::Ini<wchar_t> Ini;
 
-bool Convert(const std::wstring & value_str, std::wstring & value)
+std::wistream & operator>>(std::wistream & is, spdlog::level::level_enum & value)
 {
-	value = value_str;
-	return true;
-}
-
-bool Convert(const std::wstring & value_str, unsigned long & value) {
-	try {
-		value = std::stoul(value_str);
-	}
-	catch (...) {
-		return false;
-	}
-	return true;
-}
-
-bool Convert(const std::wstring & value_str, bool & value) {
-	if (value_str == L"true") {
-		value = true;
-		return true;
-	}
-	else if (value_str == L"false") {
-		value = false;
-		return true;
-	}
-	else {
-		return false;
-	}
-}
-
-bool Convert(const std::wstring & value_str, spdlog::level::level_enum & value) {
+	std::wstring value_str;
+	is >> value_str;
 	if (value_str == L"trace") {
 		value = spdlog::level::trace;
-		return true;
 	}
-	if (value_str == L"debug") {
+	else if (value_str == L"debug") {
 		value = spdlog::level::debug;
-		return true;
 	}
-	if (value_str == L"info") {
+	else if (value_str == L"info") {
 		value = spdlog::level::info;
-		return true;
 	}
-	if (value_str == L"warn") {
+	else if (value_str == L"warn") {
 		value = spdlog::level::warn;
-		return true;
 	}
-	if (value_str == L"err") {
+	else if (value_str == L"err") {
 		value = spdlog::level::err;
-		return true;
 	}
-	if (value_str == L"critical") {
+	else if (value_str == L"critical") {
 		value = spdlog::level::critical;
-		return true;
 	}
-	if (value_str == L"off") {
+	else if (value_str == L"off") {
 		value = spdlog::level::off;
-		return true;
 	}
-	return false;
+	else {
+		is.setstate(std::ios::failbit);
+	}
+	return is;
 }
 
 template <typename T>
@@ -80,7 +49,7 @@ bool Parse(const Ini::Section & level, const std::wstring & name, T & value)
 	}
 	else {
 		auto value_str = keyvalue->second;
-		success = Convert(value_str, value);
+		success = inipp::extract(value_str, value);
 		if (success) {
 			LOG->debug("{} = {}", wstring_to_utf8(name), wstring_to_utf8(value_str));
 		}
