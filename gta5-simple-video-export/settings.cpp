@@ -7,8 +7,6 @@
 
 #include <ShlObj.h> // SHGetKnownFolderPath
 
-typedef inipp::Ini<wchar_t> Ini;
-
 std::wstring GetKnownFolder(const KNOWNFOLDERID & fldrid)
 {
 	LOG_ENTER;
@@ -79,7 +77,7 @@ const Settings::Section & Settings::GetSec(const std::wstring & sec_name) const 
 	else {
 		LOG->error("section [{}] not found", wstring_to_utf8(sec_name));
 		LOG_EXIT;
-		return Ini::Section();
+		return Settings::Section();
 	}
 }
 
