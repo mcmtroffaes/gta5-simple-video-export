@@ -126,6 +126,7 @@ STDAPI SinkWriterBeginWriting(
 		std::wostringstream os;
 		settings->generate(os);
 		LOG->debug("settings before interpolation:\n{}", wstring_to_utf8(os.str()));
+		settings->default_section(settings->sections[L"builtin"]);
 		settings->interpolate();
 		os.str(L"");
 		settings->generate(os);
@@ -242,7 +243,7 @@ STDAPI CreateSinkWriterFromURL(
 	settings.reset(new Settings);
 	settings->ResetLogger();
 	auto enable = true;
-	auto defsec = settings->GetSec(settings->default_section_name);
+	auto defsec = settings->GetSec(L"builtin");
 	settings->GetVar(defsec, L"enable", enable);
 	if (!enable) {
 		LOG->info("mod disabled, default in-game video export will be used");

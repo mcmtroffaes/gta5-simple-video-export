@@ -51,7 +51,7 @@ Settings::Settings()
 			LOG->error("failed to parse \"{}\"", wstring_to_utf8(error));
 		}
 	}
-	Section & secdef = sections[default_section_name];
+	Section & secdef = sections[L"builtin"];
 	auto timestamp = TimeStamp();
 	auto docs = GetKnownFolder(FOLDERID_Documents);
 	auto vids = GetKnownFolder(FOLDERID_Videos);

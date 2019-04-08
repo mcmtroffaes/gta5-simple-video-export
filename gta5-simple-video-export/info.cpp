@@ -45,7 +45,7 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
 
 void AudioInfo::UpdateSettings(Settings & settings) const {
 	LOG_ENTER;
-	auto & defsec = settings.sections[settings.default_section_name];
+	auto & defsec = settings.sections[L"builtin"];
 	defsec[L"audio_rate"] = std::to_wstring(rate_);
 	defsec[L"audio_num_channels"] = std::to_wstring(num_channels_);
 	defsec[L"audio_bits_per_sample"] = std::to_wstring(bits_per_sample_);
@@ -91,7 +91,7 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 
 void VideoInfo::UpdateSettings(Settings & settings) const {
 	LOG_ENTER;
-	auto & defsec = settings.sections[settings.default_section_name];
+	auto & defsec = settings.sections[L"builtin"];
 	defsec[L"width"] = std::to_wstring(width_);
 	defsec[L"height"] = std::to_wstring(height_);
 	defsec[L"framerate_numerator"] = std::to_wstring(framerate_numerator_);
