@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "../spdlog/include/spdlog/sinks/rotating_file_sink.h"
 
 #include <ctime>
 #include <fstream>
