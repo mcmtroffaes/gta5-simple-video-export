@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../spdlog/include/spdlog/spdlog.h"
+#include "spdlog/spdlog.h"
 
 /* declaration resides in dllmain.cpp */
 extern std::shared_ptr<spdlog::logger> logger;

@@ -14,9 +14,13 @@ Detach:
 3. Clean up logger.
 */
 
+#include "spdlog\sinks\rotating_file_sink.h"
+
 #include "sinkwriter.h"
 #include "logger.h"
 #include "settings.h"
+
+#pragma comment(lib, "common.lib")
 
 std::shared_ptr<spdlog::logger> logger = nullptr;
 std::unique_ptr<Settings> settings = nullptr;
@@ -30,6 +34,8 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		logger = nullptr;
 		settings.reset(new Settings);
 		/* set up logger */
+		logger = spdlog::rotating_logger_mt(
+			SCRIPT_NAME, SCRIPT_NAME ".log", 10000000, 5);
 		settings->ResetLogger();
 		LOG_ENTER;
 		/* set up hooks */

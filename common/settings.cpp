@@ -46,10 +46,15 @@ Settings::Settings()
 	LOG_ENTER;
 	LOG->debug("parsing {}", wstring_to_utf8(ini_filename_));
 	std::wifstream is(ini_filename_);
-	parse(is);
-	if (!errors.empty()) {
-		for (auto error : errors) {
-			LOG->error("failed to parse \"{}\"", wstring_to_utf8(error));
+	if (is.fail()) {
+		LOG->error("failed to open \"{}\"", wstring_to_utf8(ini_filename_));
+	}
+	else {
+		parse(is);
+		if (!errors.empty()) {
+			for (auto error : errors) {
+				LOG->error("failed to parse \"{}\"", wstring_to_utf8(error));
+			}
 		}
 	}
 	Section & secdef = sections[L"builtin"];
@@ -86,20 +91,10 @@ void Settings::ResetLogger() {
 	LOG_ENTER;
 	auto level{ spdlog::level::info };
 	auto flush_on{ spdlog::level::off };
-	std::size_t max_file_size{ 10000000 };
-	std::size_t max_files{ 5 };
 	auto sec = GetSec(L"log");
-	if (!logger) {
-		GetVar(sec, L"max_file_size", max_file_size);
-		GetVar(sec, L"max_files", max_files);
-		logger = spdlog::rotating_logger_mt(
-			SCRIPT_NAME, SCRIPT_NAME ".log",
-			max_file_size, max_files);
-	}
 	GetVar(sec, L"level", level);
 	GetVar(sec, L"flush_on", flush_on);
 	logger->flush();
-	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [thread %t] [%l] %v");
 	logger->set_level(level);
 	logger->flush_on(flush_on);
 	LOG_EXIT;
