@@ -125,12 +125,12 @@ STDAPI SinkWriterBeginWriting(
 		video_info->UpdateSettings(*settings);
 		std::wostringstream os;
 		settings->generate(os);
-		LOG->debug("settings before interpolation:\n{}", wstring_to_utf8(os.str()));
+		LOG->debug(L"settings before interpolation:\n{}", os.str());
 		settings->default_section(settings->sections[L"builtin"]);
 		settings->interpolate();
 		os.str(L"");
 		settings->generate(os);
-		LOG->debug("settings after interpolation:\n{}", wstring_to_utf8(os.str()));
+		LOG->debug(L"settings after interpolation:\n{}", os.str());
 		auto rawsec = settings->GetSec(L"raw");
 		std::wstring audio_filename{ };
 		std::wstring video_filename{ };

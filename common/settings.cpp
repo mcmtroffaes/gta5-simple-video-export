@@ -1,5 +1,4 @@
 #include "settings.h"
-#include "../spdlog/include/spdlog/sinks/rotating_file_sink.h"
 
 #include <ctime>
 #include <fstream>
@@ -44,16 +43,16 @@ const std::wstring Settings::ini_filename_ = SCRIPT_NAME L".ini";
 Settings::Settings()
 {
 	// LOG_ENTER is deferred until the log level is set
-	LOG->debug("parsing {}", wstring_to_utf8(ini_filename_));
+	LOG->debug(L"parsing {}", ini_filename_);
 	std::wifstream is(ini_filename_);
 	if (is.fail()) {
-		LOG->error("failed to open \"{}\"", wstring_to_utf8(ini_filename_));
+		LOG->error(L"failed to open \"{}\"", ini_filename_);
 	}
 	else {
 		parse(is);
 		if (!errors.empty()) {
 			for (auto error : errors) {
-				LOG->error("failed to parse \"{}\"", wstring_to_utf8(error));
+				LOG->error(L"failed to parse \"{}\"", error);
 			}
 		}
 	}

@@ -26,7 +26,7 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	LOG->debug("audio stream index = {}", stream_index_);
 	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype_);
 	if (SUCCEEDED(hr)) {
-		LOG->info("audio subtype = {}", wstring_to_utf8(GUIDToString(subtype_)));
+		LOG->info(L"audio subtype = {}", GUIDToString(subtype_));
 		hr = input_media_type.GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &rate_);
 	}
 	if (SUCCEEDED(hr)) {
@@ -104,8 +104,8 @@ void VideoInfo::UpdateSettings(Settings & settings) const {
 		LOG->info("video format = {}", wstring_to_utf8(format->second));
 	}
 	else {
-		LOG->error("video subtype = {} = unsupported", wstring_to_utf8(subtype_str));
-		LOG->error("please add a videoformats entry for {} in {}", wstring_to_utf8(subtype_str), wstring_to_utf8(settings.ini_filename_));
+		LOG->error(L"video subtype = {} = unsupported", subtype_str);
+		LOG->error(L"please add a videoformats entry for {} in {}", subtype_str, settings.ini_filename_);
 	}
 	LOG_EXIT;
 }
@@ -118,7 +118,7 @@ void CreateBatchFile(const Settings & settings)
 	if (settings.GetVar(sec, L"batch_filename", batch_filename)) {
 		std::wstring batch_command;
 		if (settings.GetVar(sec, L"batch_command", batch_command)) {
-			LOG->info("creating {}; run this file to process the raw output", wstring_to_utf8(batch_filename));
+			LOG->info(L"creating {}; run this file to process the raw output", batch_filename);
 			std::wofstream os(batch_filename, std::ios::out | std::ios::trunc);
 			os << L"@echo off" << std::endl;
 			os << batch_command << std::endl;

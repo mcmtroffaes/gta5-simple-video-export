@@ -14,8 +14,6 @@ Detach:
 3. Clean up logger.
 */
 
-#include "spdlog\sinks\rotating_file_sink.h"
-
 #include "sinkwriter.h"
 #include "logger.h"
 #include "settings.h"
