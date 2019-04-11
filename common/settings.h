@@ -10,7 +10,6 @@ class Settings : public inipp::Ini<wchar_t>
 public:
 	static const std::wstring ini_filename_;
 	Settings();
-	void ResetLogger();
 
 	const Section & GetSec(const std::wstring & sec_name) const;
 

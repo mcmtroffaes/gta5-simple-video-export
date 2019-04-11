@@ -43,7 +43,7 @@ const std::wstring Settings::ini_filename_ = SCRIPT_NAME L".ini";
 
 Settings::Settings()
 {
-	LOG_ENTER;
+	// LOG_ENTER is deferred until the log level is set
 	LOG->debug("parsing {}", wstring_to_utf8(ini_filename_));
 	std::wifstream is(ini_filename_);
 	if (is.fail()) {
@@ -57,6 +57,17 @@ Settings::Settings()
 			}
 		}
 	}
+	auto level{ spdlog::level::info };
+	auto flush_on{ spdlog::level::off };
+	auto sec = GetSec(L"log");
+	GetVar(sec, L"level", level);
+	GetVar(sec, L"flush_on", flush_on);
+	if (logger) {
+		logger->flush();
+		logger->set_level(level);
+		logger->flush_on(flush_on);
+	}
+	LOG_ENTER;
 	Section & secdef = sections[L"builtin"];
 	auto timestamp = TimeStamp();
 	auto docs = GetKnownFolder(FOLDERID_Documents);
@@ -85,17 +96,4 @@ const Settings::Section & Settings::GetSec(const std::wstring & sec_name) const 
 		LOG_EXIT;
 		return Settings::Section();
 	}
-}
-
-void Settings::ResetLogger() {
-	LOG_ENTER;
-	auto level{ spdlog::level::info };
-	auto flush_on{ spdlog::level::off };
-	auto sec = GetSec(L"log");
-	GetVar(sec, L"level", level);
-	GetVar(sec, L"flush_on", flush_on);
-	logger->flush();
-	logger->set_level(level);
-	logger->flush_on(flush_on);
-	LOG_EXIT;
 }

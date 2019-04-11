@@ -30,13 +30,11 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 	switch (reason)
 	{
 	case DLL_PROCESS_ATTACH:
-		/* load settings without logger, to get log_level and log_flush_on */
-		logger = nullptr;
-		settings.reset(new Settings);
 		/* set up logger */
 		logger = spdlog::rotating_logger_mt(
 			SCRIPT_NAME, SCRIPT_NAME ".log", 10000000, 5);
-		settings->ResetLogger();
+		/* load settings */
+		settings.reset(new Settings);
 		LOG_ENTER;
 		/* set up hooks */
 		Hook();

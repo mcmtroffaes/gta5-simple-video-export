@@ -241,7 +241,6 @@ STDAPI CreateSinkWriterFromURL(
 	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
-	settings->ResetLogger();
 	auto enable = true;
 	auto defsec = settings->GetSec(L"builtin");
 	settings->GetVar(defsec, L"enable", enable);
