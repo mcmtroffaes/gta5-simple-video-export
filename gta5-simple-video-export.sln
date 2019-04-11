@@ -10,6 +10,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gta5-simple-video-export", 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "capstone_static", "capstone-project\capstone_static.vcxproj", "{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test.vcxproj", "{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -34,8 +36,19 @@ Global
 		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Release|x64.Build.0 = Release|x64
 		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Release|x86.ActiveCfg = Release|Win32
 		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Release|x86.Build.0 = Release|Win32
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Debug|x64.ActiveCfg = Debug|x64
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Debug|x64.Build.0 = Debug|x64
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Debug|x86.ActiveCfg = Debug|Win32
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Debug|x86.Build.0 = Debug|Win32
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Release|x64.ActiveCfg = Release|x64
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Release|x64.Build.0 = Release|x64
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Release|x86.ActiveCfg = Release|Win32
+		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F0CAD793-3F49-40B7-8ADA-DAA990CA3199}
 	EndGlobalSection
 EndGlobal

@@ -92,7 +92,7 @@ void Settings::ResetLogger() {
 	if (!logger) {
 		GetVar(sec, L"max_file_size", max_file_size);
 		GetVar(sec, L"max_files", max_files);
-		logger = spdlog::rotating_logger_st(
+		logger = spdlog::rotating_logger_mt(
 			SCRIPT_NAME, SCRIPT_NAME ".log",
 			max_file_size, max_files);
 	}
