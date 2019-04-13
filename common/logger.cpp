@@ -34,8 +34,14 @@ std::wistream & operator >> (std::wistream & is, spdlog::level::level_enum & val
 	return is;
 }
 
-std::string wstring_to_utf8(const std::wstring & str)
+std::string wstring_to_utf8(const std::wstring& str)
 {
 	std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
 	return myconv.to_bytes(str);
+}
+
+std::wstring wstring_from_utf8(const std::string& str)
+{
+	std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
+	return myconv.from_bytes(str);
 }

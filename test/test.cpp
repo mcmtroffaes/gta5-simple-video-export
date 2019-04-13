@@ -2,6 +2,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/pixdesc.h>
 }
 
 #include "settings.h"
@@ -10,6 +11,7 @@ extern "C" {
 
 std::shared_ptr<spdlog::logger> logger = nullptr;
 std::unique_ptr<Settings> settings = nullptr;
+std::mutex av_log_mutex;
 
 auto spdlog_av_level(spdlog::level::level_enum level) {
 	switch (level) {
@@ -61,27 +63,147 @@ extern "C" {
 
 void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 {
+	// each thread should have its own character buffer
+	static thread_local char line[256] = { 0 };
+	static thread_local char* pos = line;
+
+	std::lock_guard<std::mutex> lock(av_log_mutex);
 	int print_prefix = 1;
-	char line[256];
-	av_log_format_line(avcl, level, fmt, vl, line, sizeof(line), &print_prefix);
-	// remove trailing newline
-	size_t n{ strlen(line) };
-	if (n > 0 && line[n - 1] == '\n') line[n - 1] = '\0';
-	LOG->log(av_spdlog_level(level), line);
+	int remain = sizeof(line) - (pos - line);
+	int ret = av_log_format_line2(avcl, level, fmt, vl, pos, remain, &print_prefix);
+	if (ret >= 0) {
+		pos += (ret <= remain) ? ret : remain;
+	}
+	else {
+		LOG->error("failed to format av_log message '{}'", fmt);
+	}
+	// only write log message on newline
+	if ((pos > line) && *(pos - 1) == '\n') {
+		*(pos - 1) = '\0';
+		LOG->log(av_spdlog_level(level), line);
+		pos = line;
+	}
 }
 
-class AVContext {
-public:
-	AVFormatContext* oc;
-	AVCodec* audio_codec;
-	AVCodec* video_codec;
+std::wstring av_error_string(int errnum) {
+	char buffer[256];
+	av_make_error_string(buffer, sizeof(buffer), errnum);
+	return wstring_from_utf8(std::string(buffer));
+}
 
-	AVContext() : oc{ nullptr }, audio_codec{ nullptr }, video_codec{ nullptr } {
+
+class Stream {
+public:
+	AVStream* stream;
+	AVCodecContext* context;
+
+	Stream(AVFormatContext* format_context, std::wstring codec_name) :
+		stream{ nullptr }, context{ nullptr }
+	{
+		LOG_ENTER;
+		const AVCodec* codec{ avcodec_find_encoder_by_name(wstring_to_utf8(codec_name).c_str()) };
+		if (!codec) {
+			LOG->error(L"failed to find '{}' encoder", codec_name);
+		}
+		if (codec) {
+			stream = avformat_new_stream(format_context, codec);
+			if (!stream) {
+				LOG->error(L"failed to allocate '{}' codec stream", codec_name);
+			}
+			context = avcodec_alloc_context3(codec);
+			if (!context) {
+				LOG->error(L"failed to allocate '{}' codec context", codec_name);
+			}
+		}
+		LOG_EXIT;
+	}
+
+	~Stream() {
+		avcodec_free_context(&context);
+		stream = nullptr;
+	}
+};
+
+class VideoStream : public Stream {
+public:
+	VideoStream(
+		AVFormatContext* format_context, std::wstring codec_name,
+		int width, int height,
+		int framerate_numerator, int framerate_denominator,
+		AVPixelFormat pix_fmt)
+		: Stream{ format_context, codec_name }
+	{
+		LOG_ENTER;
+		if (context && context->codec) {
+			context->width = width;
+			context->height = height;
+			context->time_base = AVRational{ framerate_denominator, framerate_numerator };
+			int loss = 0;
+			if (context->codec->pix_fmts) {
+				context->pix_fmt = avcodec_find_best_pix_fmt_of_list(context->codec->pix_fmts, pix_fmt, 0, &loss);
+			}
+			else {
+				context->pix_fmt = pix_fmt;
+			}
+			if (loss) {
+				LOG->warn(
+					"pixel format conversion from {} to {} is lossy",
+					av_get_pix_fmt_name(pix_fmt),
+					av_get_pix_fmt_name(context->pix_fmt));
+			}
+			int ret = 0;
+			ret = avcodec_open2(context, NULL, NULL);
+			if (ret < 0) {
+				LOG->error("failed to open video codec");
+			}
+			if (stream) {
+				stream->time_base = context->time_base;
+				avcodec_parameters_from_context(stream->codecpar, context);
+			}
+		}
+		LOG_EXIT;
+	}
+
+};
+
+class AudioStream : public Stream {
+public:
+	AudioStream(
+		AVFormatContext* format_context, std::wstring codec_name,
+		AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+		: Stream{ format_context, codec_name }
+	{
+		LOG_ENTER;
+		context->sample_fmt = sample_fmt;
+		context->sample_rate = sample_rate;
+		context->channel_layout = channel_layout;
+		context->channels = av_get_channel_layout_nb_channels(channel_layout);
+		int ret = 0;
+		ret = avcodec_open2(context, NULL, NULL);
+		if (ret < 0) {
+			LOG->error(L"failed to open audio codec: {}", av_error_string(ret));
+		}
+		if (stream) {
+			stream->time_base = AVRational{ 1, sample_rate };
+			avcodec_parameters_from_context(stream->codecpar, context);
+		}
+		LOG_EXIT;
+	}
+};
+
+class Format {
+public:
+	AVFormatContext* context;
+	std::unique_ptr<VideoStream> vstream;
+	std::unique_ptr<AudioStream> astream;
+
+	Format() : context{ nullptr }, vstream{ nullptr }, astream{ nullptr }
+	{
+		LOG_ENTER;
 		std::wstring preset_name;
 		std::wstring container;
 		std::wstring acodec;
 		std::wstring vcodec;
-		std::wstring filter;
 		std::wstring base;
 		auto topsec = settings->GetSec(L"");
 		settings->GetVar(topsec, L"preset", preset_name);
@@ -89,40 +211,49 @@ public:
 		settings->GetVar(presetsec, L"container", container);
 		settings->GetVar(presetsec, L"audiocodec", acodec);
 		settings->GetVar(presetsec, L"videocodec", vcodec);
-		settings->GetVar(presetsec, L"filter", filter);
 		auto exportsec = settings->GetSec(L"export");
 		settings->GetVar(exportsec, L"base", base);
-		std::wstring filename = base + L"." + container;
+		std::wstring filename{ base + L"." + container };
+		std::string ufilename{ wstring_to_utf8(filename) };
 		int ret = 0;
-		ret = avformat_alloc_output_context2(&oc, NULL, NULL, wstring_to_utf8(filename).c_str());
-		if ((ret < 0) || !oc) {
-			logger->error(L"failed to allocate format context for container '{}'", container);
+		ret = avformat_alloc_output_context2(&context, NULL, NULL, ufilename.c_str());
+		if (ret < 0) {
+			LOG->error(L"failed to allocate '{}' format context: {}", container, av_error_string(ret));
 		}
-		audio_codec = avcodec_find_encoder_by_name(wstring_to_utf8(acodec).c_str());
-		if (!audio_codec) {
-			logger->error(L"failed to find '{}' encoder", acodec);
-			audio_codec = nullptr;
-		}
-		else {
-			if (audio_codec->type != AVMEDIA_TYPE_AUDIO) {
-				logger->error(L"'{}' cannot encode audio", acodec);
-				audio_codec = nullptr;
+		if (context) {
+			vstream.reset(new VideoStream(context, vcodec, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
+			astream.reset(new AudioStream(context, acodec, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
+			av_dump_format(context, 0, ufilename.c_str(), 1);
+			ret = avio_open(&context->pb, ufilename.c_str(), AVIO_FLAG_WRITE);
+			if (ret < 0) {
+				LOG->error(L"failed to open '{}' for writing: {}", filename, av_error_string(ret));
+			}
+			if (!(context->oformat->flags & AVFMT_NOFILE)) {
+				ret = avformat_write_header(context, NULL);
+				if (ret < 0) {
+					LOG->error(L"failed to write header: {}", filename, av_error_string(ret));
+					avio_closep(&context->pb);
+				}
 			}
 		}
-		video_codec = avcodec_find_encoder_by_name(wstring_to_utf8(vcodec).c_str());
-		if (!video_codec) {
-			logger->error(L"failed to find '{}' encoder", vcodec);
-		}
-		else {
-			if (video_codec->type != AVMEDIA_TYPE_VIDEO) {
-				logger->error(L"'{}' cannot encode video", vcodec);
-				video_codec = nullptr;
-			}
-		}
+		LOG_EXIT;
 	}
 
-	~AVContext() {
-		avformat_free_context(oc);
+	~Format() {
+		LOG_ENTER;
+		if (context && context->pb) {
+			int ret = av_write_trailer(context);
+			if (ret < 0) {
+				LOG->error(L"failed to write trailer: {}", av_error_string(ret));
+			}
+		}
+		vstream = nullptr;
+		astream = nullptr;
+		if (context) {
+			avio_closep(&context->pb);
+			avformat_free_context(context);
+		}
+		LOG_EXIT;
 	}
 };
 
@@ -141,7 +272,8 @@ int main()
 	os.str(L"");
 	settings->generate(os);
 	LOG->debug(L"settings after interpolation:\n{}", os.str());
-	AVContext context{};
+	auto format = std::unique_ptr<Format>(new Format{});
+	format = nullptr;
 	LOG_EXIT;
 	std::cin.get();
 }

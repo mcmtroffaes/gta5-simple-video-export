@@ -12,6 +12,9 @@ extern std::shared_ptr<spdlog::logger> logger;
 // convert wstring to UTF-8 string
 std::string wstring_to_utf8(const std::wstring & str);
 
+// convert UTF-8 string to wstring
+std::wstring wstring_from_utf8(const std::string& str);
+
 // parse spdlog::level
 std::wistream & operator >> (std::wistream & is, spdlog::level::level_enum & value);
 
