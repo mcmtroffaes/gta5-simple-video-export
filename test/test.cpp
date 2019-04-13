@@ -65,23 +65,24 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 {
 	// each thread should have its own character buffer
 	thread_local char line[256] = { 0 };
-	thread_local char* pos = line;
+	thread_local int pos = 0;
 
 	std::lock_guard<std::mutex> lock(av_log_mutex);
 	int print_prefix = 1;
-	int remain = sizeof(line) - (pos - line);
-	int ret = av_log_format_line2(avcl, level, fmt, vl, pos, remain, &print_prefix);
+	int remain = sizeof(line) - pos;
+	int ret = av_log_format_line2(avcl, level, fmt, vl, line + pos, remain, &print_prefix);
 	if (ret >= 0) {
 		pos += (ret <= remain) ? ret : remain;
 	}
 	else {
-		LOG->error("failed to format av_log message '{}'", fmt);
+		// log at the specified level rather than error level to avoid spamming the log
+		LOG->log(av_spdlog_level(level), "failed to format av_log message '{}'", fmt);
 	}
 	// only write log message on newline
-	if ((pos > line) && *(pos - 1) == '\n') {
-		*(pos - 1) = '\0';
+	if ((pos > 0) && *(line + pos - 1) == '\n') {
+		*(line + pos - 1) = '\0';
 		LOG->log(av_spdlog_level(level), line);
-		pos = line;
+		pos = 0;
 	}
 }
 
