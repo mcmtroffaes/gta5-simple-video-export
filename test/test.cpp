@@ -64,8 +64,8 @@ extern "C" {
 void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 {
 	// each thread should have its own character buffer
-	static thread_local char line[256] = { 0 };
-	static thread_local char* pos = line;
+	thread_local char line[256] = { 0 };
+	thread_local char* pos = line;
 
 	std::lock_guard<std::mutex> lock(av_log_mutex);
 	int print_prefix = 1;
@@ -97,29 +97,45 @@ public:
 	AVStream* stream;
 	AVCodecContext* context;
 
-	Stream(AVFormatContext* format_context, std::wstring codec_name) :
+	Stream(AVFormatContext* format_context, std::wstring codec_name, AVMediaType media_type) :
 		stream{ nullptr }, context{ nullptr }
 	{
 		LOG_ENTER;
-		const AVCodec* codec{ avcodec_find_encoder_by_name(wstring_to_utf8(codec_name).c_str()) };
-		if (!codec) {
-			LOG->error(L"failed to find '{}' encoder", codec_name);
+		AVCodec* codec = nullptr;
+		if (!codec_name.empty()) {
+			codec = avcodec_find_encoder_by_name(wstring_to_utf8(codec_name).c_str());
+			if (!codec) {
+				LOG->error(L"failed to find encoder '{}'", codec_name);
+			}
 		}
-		if (codec) {
-			stream = avformat_new_stream(format_context, codec);
-			if (!stream) {
-				LOG->error(L"failed to allocate '{}' codec stream", codec_name);
+		if (!codec) {
+			switch (media_type) {
+			case AVMEDIA_TYPE_VIDEO:
+				codec = avcodec_find_encoder(format_context->oformat->video_codec);
+				break;
+			case AVMEDIA_TYPE_AUDIO:
+				codec = avcodec_find_encoder(format_context->oformat->audio_codec);
+				break;
 			}
-			context = avcodec_alloc_context3(codec);
-			if (!context) {
-				LOG->error(L"failed to allocate '{}' codec context", codec_name);
+			if (codec) {
+				LOG->info("using default encoder '{}'", avcodec_get_name(codec->id));
 			}
+		}
+		stream = avformat_new_stream(format_context, codec);
+		if (!stream) {
+			LOG->error(L"failed to allocate '{}' codec stream", codec_name);
+		}
+		context = avcodec_alloc_context3(codec);
+		if (!context) {
+			LOG->error(L"failed to allocate '{}' codec context", codec_name);
 		}
 		LOG_EXIT;
 	}
 
 	~Stream() {
-		avcodec_free_context(&context);
+		if (context) {
+			avcodec_free_context(&context);
+		}
 		stream = nullptr;
 	}
 };
@@ -131,30 +147,34 @@ public:
 		int width, int height,
 		int framerate_numerator, int framerate_denominator,
 		AVPixelFormat pix_fmt)
-		: Stream{ format_context, codec_name }
+		: Stream{ format_context, codec_name, AVMEDIA_TYPE_VIDEO }
 	{
 		LOG_ENTER;
-		if (context && context->codec) {
+		if (context) {
 			context->width = width;
 			context->height = height;
 			context->time_base = AVRational{ framerate_denominator, framerate_numerator };
 			int loss = 0;
-			if (context->codec->pix_fmts) {
+			if (context->codec && context->codec->pix_fmts) {
 				context->pix_fmt = avcodec_find_best_pix_fmt_of_list(context->codec->pix_fmts, pix_fmt, 0, &loss);
 			}
 			else {
 				context->pix_fmt = pix_fmt;
 			}
+			if (context->pix_fmt != pix_fmt) {
+				LOG->info("pixel format '{}' not supported by codec", av_get_pix_fmt_name(pix_fmt));
+				LOG->info("using pixel format '{}' instead", av_get_pix_fmt_name(context->pix_fmt));
+			}
 			if (loss) {
 				LOG->warn(
-					"pixel format conversion from {} to {} is lossy",
+					"pixel format conversion from '{}' to '{}' is lossy",
 					av_get_pix_fmt_name(pix_fmt),
 					av_get_pix_fmt_name(context->pix_fmt));
 			}
 			int ret = 0;
 			ret = avcodec_open2(context, NULL, NULL);
 			if (ret < 0) {
-				LOG->error("failed to open video codec");
+				LOG->error(L"failed to open video codec: {}", av_error_string(ret));
 			}
 			if (stream) {
 				stream->time_base = context->time_base;
@@ -171,21 +191,37 @@ public:
 	AudioStream(
 		AVFormatContext* format_context, std::wstring codec_name,
 		AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-		: Stream{ format_context, codec_name }
+		: Stream{ format_context, codec_name, AVMEDIA_TYPE_AUDIO }
 	{
 		LOG_ENTER;
-		context->sample_fmt = sample_fmt;
-		context->sample_rate = sample_rate;
-		context->channel_layout = channel_layout;
-		context->channels = av_get_channel_layout_nb_channels(channel_layout);
-		int ret = 0;
-		ret = avcodec_open2(context, NULL, NULL);
-		if (ret < 0) {
-			LOG->error(L"failed to open audio codec: {}", av_error_string(ret));
-		}
-		if (stream) {
-			stream->time_base = AVRational{ 1, sample_rate };
-			avcodec_parameters_from_context(stream->codecpar, context);
+		if (context) {
+			context->sample_fmt = sample_fmt;
+			if (context->codec && context->codec->sample_fmts) {
+				const AVSampleFormat* sample_fmts = context->codec->sample_fmts;
+				context->sample_fmt = sample_fmts[0];
+				for (int i = 0; sample_fmts[i]; i++) {
+					if (sample_fmts[i] == sample_fmt) {
+						context->sample_fmt = sample_fmts[i];
+						break;
+					}
+				}
+			}
+			if (context->sample_fmt != sample_fmt) {
+				LOG->info("sample format '{}' not supported by codec", av_get_sample_fmt_name(sample_fmt));
+				LOG->info("using sample format '{}' instead", av_get_sample_fmt_name(context->sample_fmt));
+			}
+			context->sample_rate = sample_rate;
+			context->channel_layout = channel_layout;
+			context->channels = av_get_channel_layout_nb_channels(channel_layout);
+			int ret = 0;
+			ret = avcodec_open2(context, NULL, NULL);
+			if (ret < 0) {
+				LOG->error(L"failed to open audio codec: {}", av_error_string(ret));
+			}
+			if (stream) {
+				stream->time_base = AVRational{ 1, sample_rate };
+				avcodec_parameters_from_context(stream->codecpar, context);
+			}
 		}
 		LOG_EXIT;
 	}
@@ -218,7 +254,7 @@ public:
 		int ret = 0;
 		ret = avformat_alloc_output_context2(&context, NULL, NULL, ufilename.c_str());
 		if (ret < 0) {
-			LOG->error(L"failed to allocate '{}' format context: {}", container, av_error_string(ret));
+			LOG->error(L"failed to allocate output context for '{}': {}", filename, av_error_string(ret));
 		}
 		if (context) {
 			vstream.reset(new VideoStream(context, vcodec, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
@@ -228,10 +264,12 @@ public:
 			if (ret < 0) {
 				LOG->error(L"failed to open '{}' for writing: {}", filename, av_error_string(ret));
 			}
+		}
+		if (context && context->pb) {
 			if (!(context->oformat->flags & AVFMT_NOFILE)) {
 				ret = avformat_write_header(context, NULL);
 				if (ret < 0) {
-					LOG->error(L"failed to write header: {}", filename, av_error_string(ret));
+					LOG->error(L"failed to write header: {}", av_error_string(ret));
 					avio_closep(&context->pb);
 				}
 			}
@@ -267,11 +305,11 @@ int main()
 	LOG_ENTER;
 	std::wostringstream os;
 	settings->generate(os);
-	LOG->debug(L"settings before interpolation:\n{}", os.str());
+	LOG->trace(L"settings before interpolation:\n{}", os.str());
 	settings->interpolate();
 	os.str(L"");
 	settings->generate(os);
-	LOG->debug(L"settings after interpolation:\n{}", os.str());
+	LOG->trace(L"settings after interpolation:\n{}", os.str());
 	auto format = std::unique_ptr<Format>(new Format{});
 	format = nullptr;
 	LOG_EXIT;
