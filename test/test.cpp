@@ -70,19 +70,22 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 	std::lock_guard<std::mutex> lock(av_log_mutex);
 	int print_prefix = 1;
 	int remain = sizeof(line) - pos;
-	int ret = av_log_format_line2(avcl, level, fmt, vl, line + pos, remain, &print_prefix);
-	if (ret >= 0) {
-		pos += (ret <= remain) ? ret : remain;
+	if (remain > 0) {
+		int ret = av_log_format_line2(avcl, level, fmt, vl, line + pos, remain, &print_prefix);
+		if (ret >= 0) {
+			pos += (ret <= remain) ? ret : remain;
+		}
+		else {
+			// log at the specified level rather than error level to avoid spamming the log
+			LOG->log(av_spdlog_level(level), "failed to format av_log message '{}'", fmt);
+		}
 	}
-	else {
-		// log at the specified level rather than error level to avoid spamming the log
-		LOG->log(av_spdlog_level(level), "failed to format av_log message '{}'", fmt);
-	}
-	// only write log message on newline
-	if ((pos > 0) && *(line + pos - 1) == '\n') {
+	// only write log message on newline or if buffer is full
+	if (((pos > 0) && *(line + pos - 1) == '\n') || (pos == sizeof(line))) {
 		*(line + pos - 1) = '\0';
 		LOG->log(av_spdlog_level(level), line);
 		pos = 0;
+		*line = '\0';
 	}
 }
 
