@@ -80,9 +80,13 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 			LOG->log(av_spdlog_level(level), "failed to format av_log message '{}'", fmt);
 		}
 	}
-	// only write log message on newline or if buffer is full
-	if (((pos > 0) && *(line + pos - 1) == '\n') || (pos == sizeof(line))) {
-		*(line + pos - 1) = '\0';
+	// only write log message on newline
+	size_t i = strlen(fmt);
+	if ((i > 0) && (fmt[i - 1] == '\n')) {
+		// remove newline (spdlog adds a newline automatically)
+		if ((pos > 0) && (line[pos - 1] == '\n') {
+			line[pos - 1] = '\0';
+		}
 		LOG->log(av_spdlog_level(level), line);
 		pos = 0;
 		*line = '\0';
