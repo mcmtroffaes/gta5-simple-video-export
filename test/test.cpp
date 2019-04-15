@@ -194,7 +194,7 @@ public:
 
 };
 
-AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, sample_fmt) {
+AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, AVSampleFormat sample_fmt) {
 	if (!sample_fmts) {
 		return sample_fmt;
 	}
