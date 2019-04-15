@@ -194,6 +194,18 @@ public:
 
 };
 
+AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, sample_fmt) {
+	if (!sample_fmts) {
+		return sample_fmt;
+	}
+	for (int i = 0; sample_fmts[i]; i++) {
+		if (sample_fmts[i] == sample_fmt) {
+			return sample_fmt;
+		}
+	}
+	return sample_fmts[0];
+}
+
 class AudioStream : public Stream {
 public:
 	AudioStream(
@@ -203,16 +215,11 @@ public:
 	{
 		LOG_ENTER;
 		if (context) {
-			context->sample_fmt = sample_fmt;
-			if (context->codec && context->codec->sample_fmts) {
-				const AVSampleFormat* sample_fmts = context->codec->sample_fmts;
-				context->sample_fmt = sample_fmts[0];
-				for (int i = 0; sample_fmts[i]; i++) {
-					if (sample_fmts[i] == sample_fmt) {
-						context->sample_fmt = sample_fmts[i];
-						break;
-					}
-				}
+			if (context->codec) {
+				context->sample_fmt = find_best_sample_fmt_of_list(context->codec->sample_fmts, sample_fmt);
+			}
+			else {
+				context->sample_fmt = sample_fmt;
 			}
 			if (context->sample_fmt != sample_fmt) {
 				LOG->info("sample format '{}' not supported by codec", av_get_sample_fmt_name(sample_fmt));
