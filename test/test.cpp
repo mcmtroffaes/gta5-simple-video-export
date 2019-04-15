@@ -84,7 +84,7 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 	size_t i = strlen(fmt);
 	if ((i > 0) && (fmt[i - 1] == '\n')) {
 		// remove newline (spdlog adds a newline automatically)
-		if ((pos > 0) && (line[pos - 1] == '\n') {
+		if ((pos > 0) && (line[pos - 1] == '\n')) {
 			line[pos - 1] = '\0';
 		}
 		LOG->log(av_spdlog_level(level), line);
