@@ -20,12 +20,12 @@ public:
 		bool found = false;
 		auto var = sec.find(var_name);
 		if (var == sec.end()) {
-			LOG->warn("variable {} not found", wstring_to_utf8(var_name));
+			LOG->warn(L"variable {} not found", var_name);
 		}
 		else {
 			found = inipp::extract(var->second, value);
 			if (!found) {
-				LOG->error("failed to parse {}", wstring_to_utf8(var->second));
+				LOG->error(L"failed to parse {}", var->second);
 			}
 		}
 		return found;
