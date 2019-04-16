@@ -54,11 +54,11 @@ void AudioInfo::UpdateSettings(Settings & settings) const {
 	auto format = audioformats.find(subtype_str);
 	if (format != audioformats.end()) {
 		defsec[L"audio_format"] = format->second;
-		LOG->info("audio format = {}", wstring_to_utf8(format->second));
+		LOG->info(L"audio format = {}", format->second);
 	}
 	else {
-		LOG->error("audio subtype = {} = unsupported", wstring_to_utf8(subtype_str));
-		LOG->error("please add an audioformats entry for {} in {}", wstring_to_utf8(subtype_str), wstring_to_utf8(settings.ini_filename_));
+		LOG->error(L"audio subtype = {} = unsupported", subtype_str);
+		LOG->error(L"please add an audioformats entry for {} in {}", subtype_str, settings.ini_filename_);
 	}
 	LOG_EXIT;
 }
@@ -76,7 +76,7 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	LOG->debug("video stream index = {}", stream_index_);
 	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype_);
 	if (SUCCEEDED(hr)) {
-		LOG->info("video subtype = {}", wstring_to_utf8(GUIDToString(subtype_)));
+		LOG->info(L"video subtype = {}", GUIDToString(subtype_));
 		hr = MFGetAttributeSize(&input_media_type, MF_MT_FRAME_SIZE, &width_, &height_);
 	}
 	if (SUCCEEDED(hr)) {
@@ -101,7 +101,7 @@ void VideoInfo::UpdateSettings(Settings & settings) const {
 	auto format = videoformats.find(subtype_str);
 	if (format != videoformats.end()) {
 		defsec[L"video_format"] = format->second;
-		LOG->info("video format = {}", wstring_to_utf8(format->second));
+		LOG->info(L"video format = {}", format->second);
 	}
 	else {
 		LOG->error(L"video subtype = {} = unsupported", subtype_str);
