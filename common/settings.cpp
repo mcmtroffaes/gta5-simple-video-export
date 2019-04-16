@@ -83,6 +83,8 @@ Settings::Settings()
 	LOG_EXIT;
 }
 
+const Settings::Section empty_section{};
+
 const Settings::Section & Settings::GetSec(const std::wstring & sec_name) const {
 	LOG_ENTER;
 	auto sec = sections.find(sec_name);
@@ -93,6 +95,6 @@ const Settings::Section & Settings::GetSec(const std::wstring & sec_name) const 
 	else {
 		LOG->error("section [{}] not found", wstring_to_utf8(sec_name));
 		LOG_EXIT;
-		return Settings::Section();
+		return empty_section;
 	}
 }
