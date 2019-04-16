@@ -76,10 +76,10 @@ Settings::Settings()
 	secdef[L"documentsfolder"] = docs;
 	secdef[L"videosfolder"] = vids;
 	secdef[L"desktopfolder"] = desk;
-	LOG->debug("timestamp = {}", wstring_to_utf8(timestamp));
-	LOG->debug("documentsfolder = {}", wstring_to_utf8(docs));
-	LOG->debug("videosfolder = {}", wstring_to_utf8(vids));
-	LOG->debug("desktopfolder = {}", wstring_to_utf8(desk));
+	LOG->debug(L"timestamp = {}", timestamp);
+	LOG->debug(L"documentsfolder = {}", docs);
+	LOG->debug(L"videosfolder = {}", vids);
+	LOG->debug(L"desktopfolder = {}", desk);
 	LOG_EXIT;
 }
 
@@ -93,7 +93,7 @@ const Settings::Section & Settings::GetSec(const std::wstring & sec_name) const 
 		return sec->second;
 	}
 	else {
-		LOG->error("section [{}] not found", wstring_to_utf8(sec_name));
+		LOG->error(L"section [{}] not found", sec_name);
 		LOG_EXIT;
 		return empty_section;
 	}
