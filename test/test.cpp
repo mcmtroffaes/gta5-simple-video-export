@@ -125,20 +125,20 @@ class ProcessPacket {
 private:
 	AVFormatContext* format_context;
 public:
-	ProcessPacket(AVFormatContext* format_context)
-		: format_context{ format_context }
+	ProcessPacket(AVFormatContext& format_context)
+		: format_context{ &format_context }
 	{
 	};
-	void operator()(AVPacket* pkt) {
+	void operator()(AVPacket& pkt) {
 		LOG_ENTER;
-		AVRational* time_base = &format_context->streams[pkt->stream_index]->time_base;
+		AVRational* time_base = &format_context->streams[pkt.stream_index]->time_base;
 		LOG->trace(
 			L"pts:{} pts_time:{} dts:{} dts_time:{} duration:{} duration_time:{} stream_index:{}",
-			av2_ts_string(pkt->pts), av2_ts_time_string(pkt->pts, time_base),
-			av2_ts_string(pkt->dts), av2_ts_time_string(pkt->dts, time_base),
-			av2_ts_string(pkt->duration), av2_ts_time_string(pkt->duration, time_base),
-			pkt->stream_index);
-		int ret_write = av_interleaved_write_frame(format_context, pkt);
+			av2_ts_string(pkt.pts), av2_ts_time_string(pkt.pts, time_base),
+			av2_ts_string(pkt.dts), av2_ts_time_string(pkt.dts, time_base),
+			av2_ts_string(pkt.duration), av2_ts_time_string(pkt.duration, time_base),
+			pkt.stream_index);
+		int ret_write = av_interleaved_write_frame(format_context, &pkt);
 		if (ret_write < 0) {
 			LOG->error(L"failed to write packet to stream: {}", av2_error_string(ret_write));
 		}
@@ -152,7 +152,7 @@ public:
 	AVCodecContext* context;
 	AVFrame* frame;
 
-	Stream(AVFormatContext* format_context, AVCodecID codec_id) :
+	Stream(AVFormatContext& format_context, AVCodecID codec_id) :
 		stream{ nullptr }, context{ nullptr }, frame{ nullptr }
 	{
 		LOG_ENTER;
@@ -161,7 +161,7 @@ public:
 			LOG->error("failed to find encoder with codec id {}", codec_id);
 		}
 		else {
-			stream = avformat_new_stream(format_context, codec);
+			stream = avformat_new_stream(&format_context, codec);
 			if (!stream) {
 				LOG->error("failed to allocate stream for codec {}", codec->name);
 			}
@@ -177,9 +177,11 @@ public:
 		LOG_EXIT;
 	}
 
-	void ProcessFrame(ProcessPacket & process_packet) {
+	void ProcessFrame(ProcessPacket& process_packet) {
 		LOG_ENTER;
 		AVPacket pkt;
+		if (!context || !stream) // frame can be null (e.g. on flush)
+			return;
 		av_init_packet(&pkt);
 		int ret_frame = avcodec_send_frame(context, frame);
 		if (ret_frame < 0) {
@@ -188,7 +190,8 @@ public:
 		else {
 			int ret_packet = avcodec_receive_packet(context, &pkt);
 			while (!ret_packet) { // ret_packet == 0 denotes success, keep writing as long as we have success
-				process_packet(&pkt);
+				av_packet_rescale_ts(&pkt, context->time_base, stream->time_base);
+				process_packet(pkt);
 				av_packet_unref(&pkt);
 				ret_packet = avcodec_receive_packet(context, &pkt);
 			}
@@ -208,12 +211,15 @@ public:
 
 	void Flush(ProcessPacket& process_packet) {
 		LOG_ENTER;
-		av_frame_free(&frame);
-		ProcessFrame(process_packet);
+		if (frame) {
+			av_frame_free(&frame);
+			ProcessFrame(process_packet);
+		}
 		LOG_EXIT;
 	}
 
 	~Stream() {
+		LOG_ENTER;
 		if (frame) {
 			av_frame_free(&frame);
 		}
@@ -221,13 +227,14 @@ public:
 			avcodec_free_context(&context);
 		}
 		stream = nullptr;
+		LOG_EXIT;
 	}
 };
 
 class VideoStream : public Stream {
 public:
 	VideoStream(
-		AVFormatContext* format_context, AVCodecID codec_id,
+		AVFormatContext& format_context, AVCodecID codec_id,
 		int width, int height,
 		int framerate_numerator, int framerate_denominator,
 		AVPixelFormat pix_fmt)
@@ -297,7 +304,7 @@ AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, A
 class AudioStream : public Stream {
 public:
 	AudioStream(
-		AVFormatContext* format_context, AVCodecID codec_id,
+		AVFormatContext& format_context, AVCodecID codec_id,
 		AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 		: Stream{ format_context, codec_id }
 	{
@@ -328,6 +335,9 @@ public:
 			}
 			if (stream) {
 				avcodec_parameters_from_context(stream->codecpar, context);
+				// note: this is only a hint, actual stream time_base can be different
+				// avformat_write_header will set the final stream time_base
+				// see https://ffmpeg.org/doxygen/trunk/structAVStream.html#a9db755451f14e2bf590d4b85d82b32e6
 				stream->time_base = context->time_base;
 			}
 			if (frame && context->codec) {
@@ -344,6 +354,26 @@ public:
 		}
 		LOG_EXIT;
 	}
+
+	void NextFrame() {
+		const auto freq1 = 220.0;
+		const auto freq2 = 220.0 * 5.0 / 4.0; // perfect third
+		const auto delta = 0.5;
+		static uint64_t sample_count = 0;
+		LOG_ENTER;
+		int16_t* q = (int16_t*)frame->data[0];
+		for (int j = 0; j < frame->nb_samples; j++) {
+			auto two_pi_time = (2.0 * M_PI * (sample_count + j)) / frame->sample_rate;
+			int v = (int)(10000 * sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time)));
+			for (int i = 0; i < frame->channels; i++) {
+				*q++ = v;
+			}
+		}
+		frame->pts = sample_count;
+		sample_count += frame->nb_samples;
+		LOG_EXIT;
+	}
+
 };
 
 class Format {
@@ -367,9 +397,9 @@ public:
 			LOG->error(L"failed to allocate output context for '{}': {}", filename, av2_error_string(ret));
 		}
 		if (context) {
-			vstream.reset(new VideoStream(context, AV_CODEC_ID_FFV1, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
-			astream.reset(new AudioStream(context, AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
-			process_packet.reset(new ProcessPacket(context));
+			//vstream.reset(new VideoStream(*context, AV_CODEC_ID_FFV1, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
+			astream.reset(new AudioStream(*context, AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
+			process_packet.reset(new ProcessPacket(*context));
 			av_dump_format(context, 0, ufilename.c_str(), 1);
 			ret = avio_open(&context->pb, ufilename.c_str(), AVIO_FLAG_WRITE);
 			if (ret < 0) {
@@ -394,39 +424,24 @@ public:
 		}
 	}
 
-	void SendAudioFrame(const char* buffer, size_t size) {
-		static double t = 0.0;
-		static uint64_t sample_count = 0;
-		LOG_ENTER;
-		int16_t* q = (int16_t*)astream->frame->data[0];
-		for (int j = 0; j < astream->frame->nb_samples; j++) {
-			int v = (int)(sin(50.0 * 2.0 * M_PI * t));
-			for (int i = 0; i < astream->frame->channels; i++) {
-				*q++ = v;
-				t += (1.0 / astream->frame->sample_rate);
-			}
-		}
-		LOG->debug("XXX111 {} {}", astream->stream->time_base.num, astream->stream->time_base.den);
-		LOG->debug("XXX222 {} {}", astream->context->time_base.num, astream->context->time_base.den);
-		astream->frame->pts = av_rescale_q(sample_count, astream->context->time_base, astream->stream->time_base);
+	void SendAudioFrame() {
 		if (process_packet) {
 			astream->ProcessFrame(*process_packet);
 		}
-		sample_count += astream->frame->nb_samples;
 		LOG_EXIT;
 	}
 
 	~Format() {
 		LOG_ENTER;
+		if (process_packet) {
+			if (vstream) vstream->Flush(*process_packet);
+			if (astream) astream->Flush(*process_packet);
+		}
 		if (context && context->pb) {
 			int ret = av_write_trailer(context);
 			if (ret < 0) {
 				LOG->error(L"failed to write trailer: {}", av2_error_string(ret));
 			}
-		}
-		if (process_packet) {
-			if (vstream) vstream->Flush(*process_packet);
-			if (astream) astream->Flush(*process_packet);
 		}
 		vstream = nullptr;
 		astream = nullptr;
@@ -455,8 +470,10 @@ int main()
 	LOG->trace(L"settings after interpolation:\n{}", os.str());
 	auto format = std::unique_ptr<Format>(new Format{});
 	format->astream->frame->pts = 0;
-	for (int i = 0; i < 3; i++) {
-		format->SendAudioFrame(nullptr, 0);
+	const auto total_time = 10.0;
+	while (format->astream->frame->pts < total_time * format->astream->context->sample_rate) {
+		format->astream->NextFrame();
+		format->SendAudioFrame();
 	}
 	format = nullptr;
 	LOG_EXIT;
