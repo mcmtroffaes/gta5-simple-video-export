@@ -396,8 +396,8 @@ public:
 				context->sample_fmt = sample_fmt;
 			}
 			if (context->sample_fmt != sample_fmt) {
-				LOG->info("sample format '{}' not supported by codec", av_get_sample_fmt_name(sample_fmt));
-				LOG->info("using sample format '{}' instead", av_get_sample_fmt_name(context->sample_fmt));
+				LOG->info("sample format {} not supported by codec", av_get_sample_fmt_name(sample_fmt));
+				LOG->info("using sample format {} instead", av_get_sample_fmt_name(context->sample_fmt));
 			}
 			context->sample_rate = sample_rate;
 			context->channel_layout = channel_layout;
