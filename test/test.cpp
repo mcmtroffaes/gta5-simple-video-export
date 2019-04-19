@@ -190,6 +190,9 @@ public:
 		else {
 			int ret_packet = avcodec_receive_packet(context, &pkt);
 			while (!ret_packet) { // ret_packet == 0 denotes success, keep writing as long as we have success
+				// we have to set the correct stream index
+				pkt.stream_index = stream->index;
+				// we need to rescale the packet from the context time base to the stream time base
 				av_packet_rescale_ts(&pkt, context->time_base, stream->time_base);
 				process_packet(pkt);
 				av_packet_unref(&pkt);
@@ -287,6 +290,22 @@ public:
 		LOG_EXIT;
 	}
 
+	// fill frame with YUV420P data
+	void NextFrame() {
+		LOG_ENTER;
+		auto t = frame->pts * av_q2d(context->time_base);
+		for (int y = 0; y < frame->height; y++)
+			for (int x = 0; x < frame->width; x++)
+				frame->data[0][y * frame->linesize[0] + x] = (uint8_t)(x + y + t * 30);
+		for (int y = 0; y < frame->height / 2; y++) {
+			for (int x = 0; x < frame->width / 2; x++) {
+				frame->data[1][y * frame->linesize[1] + x] = (uint8_t)(128 + y + t * 20);
+				frame->data[2][y * frame->linesize[2] + x] = (uint8_t)(64 + x + t * 50);
+			}
+		}
+		frame->pts += 1;
+		LOG_EXIT;
+	}
 };
 
 AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, AVSampleFormat sample_fmt) {
@@ -398,6 +417,7 @@ public:
 		}
 		if (context) {
 			//vstream.reset(new VideoStream(*context, AV_CODEC_ID_FFV1, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
+			vstream.reset(new VideoStream(*context, AV_CODEC_ID_MPEG4, 1920, 1080, 30000, 1001, AV_PIX_FMT_YUV420P));
 			astream.reset(new AudioStream(*context, AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
 			process_packet.reset(new ProcessPacket(*context));
 			av_dump_format(context, 0, ufilename.c_str(), 1);
@@ -418,7 +438,7 @@ public:
 		LOG_EXIT;
 	}
 
-	void SendVideoFrame(const char* buffer, size_t size) {
+	void SendVideoFrame() {
 		if (process_packet) {
 			vstream->ProcessFrame(*process_packet);
 		}
@@ -470,10 +490,15 @@ int main()
 	LOG->trace(L"settings after interpolation:\n{}", os.str());
 	auto format = std::unique_ptr<Format>(new Format{});
 	format->astream->frame->pts = 0;
-	const auto total_time = 10.0;
+	format->vstream->frame->pts = 0;
+	const auto total_time = 5.0;
 	while (format->astream->frame->pts < total_time * format->astream->context->sample_rate) {
 		format->astream->NextFrame();
 		format->SendAudioFrame();
+		while (format->astream->frame->pts * av_q2d(format->astream->context->time_base) > format->vstream->frame->pts * av_q2d(format->vstream->context->time_base)) {
+			format->vstream->NextFrame();
+			format->SendVideoFrame();
+		}
 	}
 	format = nullptr;
 	LOG_EXIT;
