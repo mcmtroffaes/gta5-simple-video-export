@@ -121,6 +121,31 @@ std::wstring av2_ts_time_string(uint64_t ts, AVRational *tb) {
 	return wstring_from_utf8(std::string(buffer));
 }
 
+class ProcessPacket {
+private:
+	AVFormatContext* format_context;
+public:
+	ProcessPacket(AVFormatContext* format_context)
+		: format_context{ format_context }
+	{
+	};
+	void operator()(AVPacket* pkt) {
+		LOG_ENTER;
+		AVRational* time_base = &format_context->streams[pkt->stream_index]->time_base;
+		LOG->trace(
+			L"pts:{} pts_time:{} dts:{} dts_time:{} duration:{} duration_time:{} stream_index:{}",
+			av2_ts_string(pkt->pts), av2_ts_time_string(pkt->pts, time_base),
+			av2_ts_string(pkt->dts), av2_ts_time_string(pkt->dts, time_base),
+			av2_ts_string(pkt->duration), av2_ts_time_string(pkt->duration, time_base),
+			pkt->stream_index);
+		int ret_write = av_interleaved_write_frame(format_context, pkt);
+		if (ret_write < 0) {
+			LOG->error(L"failed to write packet to stream: {}", av2_error_string(ret_write));
+		}
+		LOG_EXIT;
+	}
+};
+
 class Stream {
 public:
 	AVStream* stream;
@@ -149,6 +174,42 @@ public:
 				LOG->error("failed to allocate frame");
 			}
 		}
+		LOG_EXIT;
+	}
+
+	void ProcessFrame(ProcessPacket & process_packet) {
+		LOG_ENTER;
+		AVPacket pkt;
+		av_init_packet(&pkt);
+		int ret_frame = avcodec_send_frame(context, frame);
+		if (ret_frame < 0) {
+			LOG->error(L"failed to send frame to encoder: {}", av2_error_string(ret_frame));
+		}
+		else {
+			int ret_packet = avcodec_receive_packet(context, &pkt);
+			while (!ret_packet) { // ret_packet == 0 denotes success, keep writing as long as we have success
+				process_packet(&pkt);
+				av_packet_unref(&pkt);
+				ret_packet = avcodec_receive_packet(context, &pkt);
+			}
+			if (frame) {
+				if (ret_packet != AVERROR(EAGAIN)) {
+					LOG->error(L"failed to receive packet from encoder: {}", av2_error_string(ret_packet));
+				}
+			}
+			else {
+				if (ret_packet != AVERROR_EOF) {
+					LOG->error(L"failed to receive final packet from encoder: {}", av2_error_string(ret_packet));
+				}
+			}
+		}
+		LOG_EXIT;
+	}
+
+	void Flush(ProcessPacket& process_packet) {
+		LOG_ENTER;
+		av_frame_free(&frame);
+		ProcessFrame(process_packet);
 		LOG_EXIT;
 	}
 
@@ -290,6 +351,7 @@ public:
 	AVFormatContext* context;
 	std::unique_ptr<VideoStream> vstream;
 	std::unique_ptr<AudioStream> astream;
+	std::unique_ptr<ProcessPacket> process_packet;
 
 	Format() : context{ nullptr }, vstream{ nullptr }, astream{ nullptr }
 	{
@@ -307,6 +369,7 @@ public:
 		if (context) {
 			vstream.reset(new VideoStream(context, AV_CODEC_ID_FFV1, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
 			astream.reset(new AudioStream(context, AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
+			process_packet.reset(new ProcessPacket(context));
 			av_dump_format(context, 0, ufilename.c_str(), 1);
 			ret = avio_open(&context->pb, ufilename.c_str(), AVIO_FLAG_WRITE);
 			if (ret < 0) {
@@ -325,52 +388,10 @@ public:
 		LOG_EXIT;
 	}
 
-	void LogPacket(const AVPacket* pkt)
-	{
-		// do not log enter & exit to reduce clutter
-		AVRational* time_base = &context->streams[pkt->stream_index]->time_base;
-		LOG->trace(L"pts:{} pts_time:{} dts:{} dts_time:{} duration:{} duration_time:{} stream_index:{}",
-			av2_ts_string(pkt->pts), av2_ts_time_string(pkt->pts, time_base),
-			av2_ts_string(pkt->dts), av2_ts_time_string(pkt->dts, time_base),
-			av2_ts_string(pkt->duration), av2_ts_time_string(pkt->duration, time_base),
-			pkt->stream_index);
-	}
-
-	void SendFrame(Stream& stream) {
-		LOG_ENTER;
-		AVPacket pkt;
-		av_init_packet(&pkt);
-		int ret_frame = avcodec_send_frame(stream.context, stream.frame);
-		if (ret_frame < 0) {
-			LOG->error(L"failed to send frame to encoder: {}", av2_error_string(ret_frame));
-		}
-		else {
-			int ret_packet = avcodec_receive_packet(stream.context, &pkt);
-			while (!ret_packet) { // ret_packet == 0 denotes success, keep writing as long as we have success
-				LogPacket(&pkt);
-				int ret_write = av_interleaved_write_frame(context, &pkt);
-				if (ret_write < 0) {
-					LOG->error(L"failed to write packet to stream: {}", av2_error_string(ret_write));
-				}
-				av_packet_unref(&pkt);
-				ret_packet = avcodec_receive_packet(stream.context, &pkt);
-			}
-			if (stream.frame) {
-				if (ret_packet != AVERROR(EAGAIN)) {
-					LOG->error(L"failed to receive packet from encoder: {}", av2_error_string(ret_packet));
-				}
-			}
-			else {
-				if (ret_packet != AVERROR_EOF) {
-					LOG->error(L"failed to receive final packet from encoder: {}", av2_error_string(ret_packet));
-				}
-			}
-		}
-		LOG_EXIT;
-	}
-
 	void SendVideoFrame(const char* buffer, size_t size) {
-		SendFrame(*vstream);
+		if (process_packet) {
+			vstream->ProcessFrame(*process_packet);
+		}
 	}
 
 	void SendAudioFrame(const char* buffer, size_t size) {
@@ -388,7 +409,9 @@ public:
 		LOG->debug("XXX111 {} {}", astream->stream->time_base.num, astream->stream->time_base.den);
 		LOG->debug("XXX222 {} {}", astream->context->time_base.num, astream->context->time_base.den);
 		astream->frame->pts = av_rescale_q(sample_count, astream->context->time_base, astream->stream->time_base);
-		SendFrame(*astream);
+		if (process_packet) {
+			astream->ProcessFrame(*process_packet);
+		}
 		sample_count += astream->frame->nb_samples;
 		LOG_EXIT;
 	}
@@ -400,6 +423,10 @@ public:
 			if (ret < 0) {
 				LOG->error(L"failed to write trailer: {}", av2_error_string(ret));
 			}
+		}
+		if (process_packet) {
+			if (vstream) vstream->Flush(*process_packet);
+			if (astream) astream->Flush(*process_packet);
 		}
 		vstream = nullptr;
 		astream = nullptr;
@@ -431,9 +458,6 @@ int main()
 	for (int i = 0; i < 3; i++) {
 		format->SendAudioFrame(nullptr, 0);
 	}
-	// flush by sending null frame
-	av_frame_free(&format->astream->frame);
-	format->SendFrame(*format->astream);
 	format = nullptr;
 	LOG_EXIT;
 	std::cin.get();
