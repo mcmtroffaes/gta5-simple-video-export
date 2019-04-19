@@ -5,6 +5,8 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/timestamp.h>
+#include <libswscale/swscale.h>
+#include <libswresample/swresample.h>
 }
 
 #include "settings.h"
@@ -234,14 +236,36 @@ public:
 	}
 };
 
+void FillFrameNV12(AVFrame* f, AVRational& time_base) {
+	LOG_ENTER;
+	if (f->format != AV_PIX_FMT_NV12) {
+		LOG->error("wrong pixel format for filling frame");
+		return;
+	}
+	auto t = f->pts * av_q2d(time_base);
+	for (int y = 0; y < f->height; y++)
+		for (int x = 0; x < f->width; x++)
+			f->data[0][y * f->linesize[0] + x] = (uint8_t)(x + y + t * 30);
+	for (int y = 0; y < f->height / 2; y++) {
+		for (int x = 0; x < f->width / 2; x++) {
+			f->data[1][y * f->linesize[1] + 2 * x] = (uint8_t)(128 + y + t * 20);
+			f->data[1][y * f->linesize[1] + 2 * x + 1] = (uint8_t)(64 + x + t * 50);
+		}
+	}
+	LOG_EXIT;
+}
+
 class VideoStream : public Stream {
 public:
+	const AVPixelFormat pix_fmt;
+	AVFrame* tmp_frame;
+
 	VideoStream(
 		AVFormatContext& format_context, AVCodecID codec_id,
 		int width, int height,
 		int framerate_numerator, int framerate_denominator,
 		AVPixelFormat pix_fmt)
-		: Stream{ format_context, codec_id }
+		: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }, tmp_frame{ nullptr }
 	{
 		LOG_ENTER;
 		if (context) {
@@ -259,12 +283,16 @@ public:
 				context->pix_fmt = pix_fmt;
 			}
 			if (context->pix_fmt != pix_fmt) {
-				LOG->info("pixel format '{}' not supported by codec", av_get_pix_fmt_name(pix_fmt));
-				LOG->info("using pixel format '{}' instead", av_get_pix_fmt_name(context->pix_fmt));
+				LOG->info("pixel format {} not supported by codec", av_get_pix_fmt_name(pix_fmt));
+				LOG->info("using pixel format {} instead", av_get_pix_fmt_name(context->pix_fmt));
+				tmp_frame = av_frame_alloc();
+				if (!tmp_frame) {
+					LOG->error("failed to allocate conversion frame");
+				}
 			}
 			if (loss) {
 				LOG->warn(
-					"pixel format conversion from '{}' to '{}' is lossy",
+					"pixel format conversion from {} to {} is lossy",
 					av_get_pix_fmt_name(pix_fmt),
 					av_get_pix_fmt_name(context->pix_fmt));
 			}
@@ -277,33 +305,58 @@ public:
 				stream->time_base = context->time_base;
 				avcodec_parameters_from_context(stream->codecpar, context);
 			}
-		}
-		if (frame) {
-			frame->width = width;
-			frame->height = height;
-			frame->format = pix_fmt;
-			int ret = av_frame_get_buffer(frame, 32);
-			if (ret < 0) {
-				LOG->error("failed to allocate frame buffer");
+			if (frame) {
+				frame->width = width;
+				frame->height = height;
+				frame->format = context->pix_fmt;
+				frame->pts = 0;
+				int ret = av_frame_get_buffer(frame, 32);
+				if (ret < 0) {
+					LOG->error("failed to allocate frame buffer");
+				}
+			}
+			if (tmp_frame) {
+				tmp_frame->width = width;
+				tmp_frame->height = height;
+				tmp_frame->format = pix_fmt;
+				tmp_frame->pts = 0;
+				int ret = av_frame_get_buffer(tmp_frame, 32);
+				if (ret < 0) {
+					LOG->error("failed to allocate frame buffer");
+				}
 			}
 		}
 		LOG_EXIT;
 	}
 
-	// fill frame with YUV420P data
+	// fill frame with NV12 data
 	void NextFrame() {
 		LOG_ENTER;
-		auto t = frame->pts * av_q2d(context->time_base);
-		for (int y = 0; y < frame->height; y++)
-			for (int x = 0; x < frame->width; x++)
-				frame->data[0][y * frame->linesize[0] + x] = (uint8_t)(x + y + t * 30);
-		for (int y = 0; y < frame->height / 2; y++) {
-			for (int x = 0; x < frame->width / 2; x++) {
-				frame->data[1][y * frame->linesize[1] + x] = (uint8_t)(128 + y + t * 20);
-				frame->data[2][y * frame->linesize[2] + x] = (uint8_t)(64 + x + t * 50);
+		if (frame) {
+			if (tmp_frame) {
+				FillFrameNV12(tmp_frame, context->time_base);
+				struct SwsContext* sws = sws_getContext(
+					tmp_frame->width, tmp_frame->height, pix_fmt,
+					frame->width, frame->height, context->pix_fmt,
+					SWS_BICUBIC, nullptr, nullptr, nullptr);
+				if (!sws) {
+					LOG->error("failed to initialize pixel conversion context");
+				}
+				else {
+					sws_scale(
+						sws,
+						tmp_frame->data, tmp_frame->linesize, 0, tmp_frame->height,
+						frame->data, frame->linesize);
+					sws_freeContext(sws);
+				}
+				tmp_frame->pts += 1;
+				frame->pts += 1;
+			}
+			else {
+				FillFrameNV12(frame, context->time_base);
+				frame->pts += 1;
 			}
 		}
-		frame->pts += 1;
 		LOG_EXIT;
 	}
 };
@@ -322,10 +375,13 @@ AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, A
 
 class AudioStream : public Stream {
 public:
+	const AVSampleFormat sample_fmt;
+	AVFrame* tmp_frame;
+
 	AudioStream(
 		AVFormatContext& format_context, AVCodecID codec_id,
 		AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-		: Stream{ format_context, codec_id }
+		: Stream{ format_context, codec_id }, sample_fmt{ sample_fmt }, tmp_frame{ nullptr }
 	{
 		LOG_ENTER;
 		if (context && context->codec_type != AVMEDIA_TYPE_AUDIO) {
@@ -364,6 +420,7 @@ public:
 				frame->sample_rate = sample_rate;
 				frame->channel_layout = channel_layout;
 				frame->nb_samples = (context->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) ? 1000 : context->frame_size;
+				frame->pts = 0;
 				LOG->debug("audio buffer size is {}", frame->nb_samples);
 				int ret = av_frame_get_buffer(frame, 32);
 				if (ret < 0) {
@@ -416,8 +473,7 @@ public:
 			LOG->error(L"failed to allocate output context for '{}': {}", filename, av2_error_string(ret));
 		}
 		if (context) {
-			//vstream.reset(new VideoStream(*context, AV_CODEC_ID_FFV1, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
-			vstream.reset(new VideoStream(*context, AV_CODEC_ID_MPEG4, 1920, 1080, 30000, 1001, AV_PIX_FMT_YUV420P));
+			vstream.reset(new VideoStream(*context, AV_CODEC_ID_FFV1, 1920, 1080, 30000, 1001, AV_PIX_FMT_NV12));
 			astream.reset(new AudioStream(*context, AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
 			process_packet.reset(new ProcessPacket(*context));
 			av_dump_format(context, 0, ufilename.c_str(), 1);
@@ -489,8 +545,6 @@ int main()
 	settings->generate(os);
 	LOG->trace(L"settings after interpolation:\n{}", os.str());
 	auto format = std::unique_ptr<Format>(new Format{});
-	format->astream->frame->pts = 0;
-	format->vstream->frame->pts = 0;
 	const auto total_time = 5.0;
 	while (format->astream->frame->pts < total_time * format->astream->context->sample_rate) {
 		format->astream->NextFrame();
