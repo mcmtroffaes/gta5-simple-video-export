@@ -4,6 +4,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/timestamp.h>
 }
 
 #include "settings.h"
@@ -70,10 +71,6 @@ auto av_spdlog_level(int level) {
 	}
 }
 
-extern "C" {
-	void av_log_callback(void* avcl, int level, const char* fmt, va_list vl);
-}
-
 void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 {
 	// each thread should have its own character buffer
@@ -106,54 +103,59 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 	}
 }
 
-std::wstring av_error_string(int errnum) {
-	char buffer[256];
+std::wstring av2_error_string(int errnum) {
+	char buffer[AV_ERROR_MAX_STRING_SIZE] = { 0 };
 	av_make_error_string(buffer, sizeof(buffer), errnum);
 	return wstring_from_utf8(std::string(buffer));
 }
 
+std::wstring av2_ts_string(uint64_t ts) {
+	char buffer[AV_TS_MAX_STRING_SIZE] = { 0 };
+	av_ts_make_string(buffer, ts);
+	return wstring_from_utf8(std::string(buffer));
+}
+
+std::wstring av2_ts_time_string(uint64_t ts, AVRational *tb) {
+	char buffer[AV_TS_MAX_STRING_SIZE] = { 0 };
+	av_ts_make_time_string(buffer, ts, tb);
+	return wstring_from_utf8(std::string(buffer));
+}
 
 class Stream {
 public:
 	AVStream* stream;
 	AVCodecContext* context;
+	AVFrame* frame;
 
-	Stream(AVFormatContext* format_context, std::wstring codec_name, AVMediaType media_type) :
-		stream{ nullptr }, context{ nullptr }
+	Stream(AVFormatContext* format_context, AVCodecID codec_id) :
+		stream{ nullptr }, context{ nullptr }, frame{ nullptr }
 	{
 		LOG_ENTER;
-		AVCodec* codec = nullptr;
-		if (!codec_name.empty()) {
-			codec = avcodec_find_encoder_by_name(wstring_to_utf8(codec_name).c_str());
-			if (!codec) {
-				LOG->error(L"failed to find encoder '{}'", codec_name);
-			}
-		}
+		const AVCodec* codec = avcodec_find_encoder(codec_id);
 		if (!codec) {
-			switch (media_type) {
-			case AVMEDIA_TYPE_VIDEO:
-				codec = avcodec_find_encoder(format_context->oformat->video_codec);
-				break;
-			case AVMEDIA_TYPE_AUDIO:
-				codec = avcodec_find_encoder(format_context->oformat->audio_codec);
-				break;
-			}
-			if (codec) {
-				LOG->info("using default encoder '{}'", avcodec_get_name(codec->id));
-			}
+			LOG->error("failed to find encoder with codec id {}", codec_id);
 		}
-		stream = avformat_new_stream(format_context, codec);
-		if (!stream) {
-			LOG->error(L"failed to allocate '{}' codec stream", codec_name);
-		}
-		context = avcodec_alloc_context3(codec);
-		if (!context) {
-			LOG->error(L"failed to allocate '{}' codec context", codec_name);
+		else {
+			stream = avformat_new_stream(format_context, codec);
+			if (!stream) {
+				LOG->error("failed to allocate stream for codec {}", codec->name);
+			}
+			context = avcodec_alloc_context3(codec);
+			if (!context) {
+				LOG->error("failed to allocate context for codec {}", codec->name);
+			}
+			frame = av_frame_alloc();
+			if (!frame) {
+				LOG->error("failed to allocate frame");
+			}
 		}
 		LOG_EXIT;
 	}
 
 	~Stream() {
+		if (frame) {
+			av_frame_free(&frame);
+		}
 		if (context) {
 			avcodec_free_context(&context);
 		}
@@ -164,14 +166,17 @@ public:
 class VideoStream : public Stream {
 public:
 	VideoStream(
-		AVFormatContext* format_context, std::wstring codec_name,
+		AVFormatContext* format_context, AVCodecID codec_id,
 		int width, int height,
 		int framerate_numerator, int framerate_denominator,
 		AVPixelFormat pix_fmt)
-		: Stream{ format_context, codec_name, AVMEDIA_TYPE_VIDEO }
+		: Stream{ format_context, codec_id }
 	{
 		LOG_ENTER;
 		if (context) {
+			if (context->codec && context->codec->type != AVMEDIA_TYPE_VIDEO) {
+				LOG->warn("selected video codec {} does not support video", context->codec->name);
+			}
 			context->width = width;
 			context->height = height;
 			context->time_base = AVRational{ framerate_denominator, framerate_numerator };
@@ -195,11 +200,20 @@ public:
 			int ret = 0;
 			ret = avcodec_open2(context, NULL, NULL);
 			if (ret < 0) {
-				LOG->error(L"failed to open video codec: {}", av_error_string(ret));
+				LOG->error(L"failed to open video codec: {}", av2_error_string(ret));
 			}
 			if (stream) {
 				stream->time_base = context->time_base;
 				avcodec_parameters_from_context(stream->codecpar, context);
+			}
+		}
+		if (frame) {
+			frame->width = width;
+			frame->height = height;
+			frame->format = pix_fmt;
+			int ret = av_frame_get_buffer(frame, 32);
+			if (ret < 0) {
+				LOG->error("failed to allocate frame buffer");
 			}
 		}
 		LOG_EXIT;
@@ -222,11 +236,15 @@ AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, A
 class AudioStream : public Stream {
 public:
 	AudioStream(
-		AVFormatContext* format_context, std::wstring codec_name,
+		AVFormatContext* format_context, AVCodecID codec_id,
 		AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-		: Stream{ format_context, codec_name, AVMEDIA_TYPE_AUDIO }
+		: Stream{ format_context, codec_id }
 	{
 		LOG_ENTER;
+		if (context && context->codec_type != AVMEDIA_TYPE_AUDIO) {
+			LOG->warn("selected audio codec does not support audio");
+			avcodec_free_context(&context);
+		}
 		if (context) {
 			if (context->codec) {
 				context->sample_fmt = find_best_sample_fmt_of_list(context->codec->sample_fmts, sample_fmt);
@@ -241,14 +259,26 @@ public:
 			context->sample_rate = sample_rate;
 			context->channel_layout = channel_layout;
 			context->channels = av_get_channel_layout_nb_channels(channel_layout);
+			context->time_base = AVRational{ 1, sample_rate };
 			int ret = 0;
 			ret = avcodec_open2(context, NULL, NULL);
 			if (ret < 0) {
-				LOG->error(L"failed to open audio codec: {}", av_error_string(ret));
+				LOG->error(L"failed to open audio codec: {}", av2_error_string(ret));
 			}
 			if (stream) {
-				stream->time_base = AVRational{ 1, sample_rate };
 				avcodec_parameters_from_context(stream->codecpar, context);
+				stream->time_base = context->time_base;
+			}
+			if (frame && context->codec) {
+				frame->format = sample_fmt;
+				frame->sample_rate = sample_rate;
+				frame->channel_layout = channel_layout;
+				frame->nb_samples = (context->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) ? 1000 : context->frame_size;
+				LOG->debug("audio buffer size is {}", frame->nb_samples);
+				int ret = av_frame_get_buffer(frame, 32);
+				if (ret < 0) {
+					LOG->error("failed to allocate frame buffer");
+				}
 			}
 		}
 		LOG_EXIT;
@@ -264,44 +294,102 @@ public:
 	Format() : context{ nullptr }, vstream{ nullptr }, astream{ nullptr }
 	{
 		LOG_ENTER;
-		std::wstring preset_name;
-		std::wstring container;
-		std::wstring acodec;
-		std::wstring vcodec;
 		std::wstring base;
-		auto topsec = settings->GetSec(L"");
-		settings->GetVar(topsec, L"preset", preset_name);
-		auto presetsec = settings->GetSec(preset_name);
-		settings->GetVar(presetsec, L"container", container);
-		settings->GetVar(presetsec, L"audiocodec", acodec);
-		settings->GetVar(presetsec, L"videocodec", vcodec);
 		auto exportsec = settings->GetSec(L"export");
 		settings->GetVar(exportsec, L"base", base);
-		std::wstring filename{ base + L"." + container };
+		std::wstring filename{ base + L".mkv" };
 		std::string ufilename{ wstring_to_utf8(filename) };
 		int ret = 0;
 		ret = avformat_alloc_output_context2(&context, NULL, NULL, ufilename.c_str());
 		if (ret < 0) {
-			LOG->error(L"failed to allocate output context for '{}': {}", filename, av_error_string(ret));
+			LOG->error(L"failed to allocate output context for '{}': {}", filename, av2_error_string(ret));
 		}
 		if (context) {
-			vstream.reset(new VideoStream(context, vcodec, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
-			astream.reset(new AudioStream(context, acodec, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
+			vstream.reset(new VideoStream(context, AV_CODEC_ID_FFV1, 1920, 1080, 60000, 1001, AV_PIX_FMT_NV12));
+			astream.reset(new AudioStream(context, AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
 			av_dump_format(context, 0, ufilename.c_str(), 1);
 			ret = avio_open(&context->pb, ufilename.c_str(), AVIO_FLAG_WRITE);
 			if (ret < 0) {
-				LOG->error(L"failed to open '{}' for writing: {}", filename, av_error_string(ret));
+				LOG->error(L"failed to open '{}' for writing: {}", filename, av2_error_string(ret));
 			}
 		}
 		if (context && context->pb) {
 			if (!(context->oformat->flags & AVFMT_NOFILE)) {
 				ret = avformat_write_header(context, NULL);
 				if (ret < 0) {
-					LOG->error(L"failed to write header: {}", av_error_string(ret));
+					LOG->error(L"failed to write header: {}", av2_error_string(ret));
 					avio_closep(&context->pb);
 				}
 			}
 		}
+		LOG_EXIT;
+	}
+
+	void LogPacket(const AVPacket* pkt)
+	{
+		// do not log enter & exit to reduce clutter
+		AVRational* time_base = &context->streams[pkt->stream_index]->time_base;
+		LOG->trace(L"pts:{} pts_time:{} dts:{} dts_time:{} duration:{} duration_time:{} stream_index:{}",
+			av2_ts_string(pkt->pts), av2_ts_time_string(pkt->pts, time_base),
+			av2_ts_string(pkt->dts), av2_ts_time_string(pkt->dts, time_base),
+			av2_ts_string(pkt->duration), av2_ts_time_string(pkt->duration, time_base),
+			pkt->stream_index);
+	}
+
+	void SendFrame(Stream& stream) {
+		LOG_ENTER;
+		AVPacket pkt;
+		av_init_packet(&pkt);
+		int ret_frame = avcodec_send_frame(stream.context, stream.frame);
+		if (ret_frame < 0) {
+			LOG->error(L"failed to send frame to encoder: {}", av2_error_string(ret_frame));
+		}
+		else {
+			int ret_packet = avcodec_receive_packet(stream.context, &pkt);
+			while (!ret_packet) { // ret_packet == 0 denotes success, keep writing as long as we have success
+				LogPacket(&pkt);
+				int ret_write = av_interleaved_write_frame(context, &pkt);
+				if (ret_write < 0) {
+					LOG->error(L"failed to write packet to stream: {}", av2_error_string(ret_write));
+				}
+				av_packet_unref(&pkt);
+				ret_packet = avcodec_receive_packet(stream.context, &pkt);
+			}
+			if (stream.frame) {
+				if (ret_packet != AVERROR(EAGAIN)) {
+					LOG->error(L"failed to receive packet from encoder: {}", av2_error_string(ret_packet));
+				}
+			}
+			else {
+				if (ret_packet != AVERROR_EOF) {
+					LOG->error(L"failed to receive final packet from encoder: {}", av2_error_string(ret_packet));
+				}
+			}
+		}
+		LOG_EXIT;
+	}
+
+	void SendVideoFrame(const char* buffer, size_t size) {
+		SendFrame(*vstream);
+	}
+
+	void SendAudioFrame(const char* buffer, size_t size) {
+		static double t = 0.0;
+		static uint64_t sample_count = 0;
+		LOG_ENTER;
+		int16_t* q = (int16_t*)astream->frame->data[0];
+		for (int j = 0; j < astream->frame->nb_samples; j++) {
+			int v = (int)(sin(50.0 * 2.0 * M_PI * t));
+			for (int i = 0; i < astream->frame->channels; i++) {
+				*q++ = v;
+				t += (1.0 / astream->frame->sample_rate);
+			}
+		}
+		LOG->debug("XXX111 {} {}", astream->stream->time_base.num, astream->stream->time_base.den);
+		LOG->debug("XXX222 {} {}", astream->context->time_base.num, astream->context->time_base.den);
+		astream->frame->pts = av_rescale_q(sample_count, astream->context->time_base, astream->stream->time_base);
+		SendFrame(*astream);
+		sample_count += astream->frame->nb_samples;
 		LOG_EXIT;
 	}
 
@@ -310,7 +398,7 @@ public:
 		if (context && context->pb) {
 			int ret = av_write_trailer(context);
 			if (ret < 0) {
-				LOG->error(L"failed to write trailer: {}", av_error_string(ret));
+				LOG->error(L"failed to write trailer: {}", av2_error_string(ret));
 			}
 		}
 		vstream = nullptr;
@@ -339,6 +427,13 @@ int main()
 	settings->generate(os);
 	LOG->trace(L"settings after interpolation:\n{}", os.str());
 	auto format = std::unique_ptr<Format>(new Format{});
+	format->astream->frame->pts = 0;
+	for (int i = 0; i < 3; i++) {
+		format->SendAudioFrame(nullptr, 0);
+	}
+	// flush by sending null frame
+	av_frame_free(&format->astream->frame);
+	format->SendFrame(*format->astream);
 	format = nullptr;
 	LOG_EXIT;
 	std::cin.get();
