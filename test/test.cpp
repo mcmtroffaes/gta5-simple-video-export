@@ -105,22 +105,22 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 	}
 }
 
-std::wstring av2_error_string(int errnum) {
+auto av2_error_string(int errnum) {
 	char buffer[AV_ERROR_MAX_STRING_SIZE] = { 0 };
 	av_make_error_string(buffer, sizeof(buffer), errnum);
-	return wstring_from_utf8(std::string(buffer));
+	return std::string(buffer);
 }
 
-std::wstring av2_ts_string(uint64_t ts) {
+auto av2_ts_string(uint64_t ts) {
 	char buffer[AV_TS_MAX_STRING_SIZE] = { 0 };
 	av_ts_make_string(buffer, ts);
-	return wstring_from_utf8(std::string(buffer));
+	return std::string(buffer);
 }
 
-std::wstring av2_ts_time_string(uint64_t ts, AVRational *tb) {
+auto av2_ts_time_string(uint64_t ts, AVRational *tb) {
 	char buffer[AV_TS_MAX_STRING_SIZE] = { 0 };
 	av_ts_make_time_string(buffer, ts, tb);
-	return wstring_from_utf8(std::string(buffer));
+	return std::string(buffer);
 }
 
 class ProcessPacket {
@@ -134,15 +134,15 @@ public:
 	void operator()(AVPacket& pkt) {
 		LOG_ENTER;
 		AVRational* time_base = &format_context->streams[pkt.stream_index]->time_base;
-		LOG->trace(
-			L"pts:{} pts_time:{} dts:{} dts_time:{} duration:{} duration_time:{} stream_index:{}",
+		LOG->debug(
+			"pts:{} pts_time:{} dts:{} dts_time:{} duration:{} duration_time:{} stream_index:{}",
 			av2_ts_string(pkt.pts), av2_ts_time_string(pkt.pts, time_base),
 			av2_ts_string(pkt.dts), av2_ts_time_string(pkt.dts, time_base),
 			av2_ts_string(pkt.duration), av2_ts_time_string(pkt.duration, time_base),
 			pkt.stream_index);
 		int ret_write = av_interleaved_write_frame(format_context, &pkt);
 		if (ret_write < 0) {
-			LOG->error(L"failed to write packet to stream: {}", av2_error_string(ret_write));
+			LOG->error("failed to write packet to stream: {}", av2_error_string(ret_write));
 		}
 		LOG_EXIT;
 	}
@@ -187,7 +187,7 @@ public:
 		av_init_packet(&pkt);
 		int ret_frame = avcodec_send_frame(context, frame);
 		if (ret_frame < 0) {
-			LOG->error(L"failed to send frame to encoder: {}", av2_error_string(ret_frame));
+			LOG->error("failed to send frame to encoder: {}", av2_error_string(ret_frame));
 		}
 		else {
 			int ret_packet = avcodec_receive_packet(context, &pkt);
@@ -202,12 +202,12 @@ public:
 			}
 			if (frame) {
 				if (ret_packet != AVERROR(EAGAIN)) {
-					LOG->error(L"failed to receive packet from encoder: {}", av2_error_string(ret_packet));
+					LOG->error("failed to receive packet from encoder: {}", av2_error_string(ret_packet));
 				}
 			}
 			else {
 				if (ret_packet != AVERROR_EOF) {
-					LOG->error(L"failed to receive final packet from encoder: {}", av2_error_string(ret_packet));
+					LOG->error("failed to receive final packet from encoder: {}", av2_error_string(ret_packet));
 				}
 			}
 		}
@@ -236,24 +236,78 @@ public:
 	}
 };
 
-void FillFrameNV12(AVFrame* f, AVRational& time_base) {
+auto MakeFrameData(size_t width, size_t height, double t, AVPixelFormat pix_fmt) {
 	LOG_ENTER;
-	if (f->format != AV_PIX_FMT_NV12) {
-		LOG->error("wrong pixel format for filling frame");
-		return;
+	std::unique_ptr<uint8_t[]> data{ nullptr };
+	size_t i{ 0 };
+	switch (pix_fmt) {
+	case AV_PIX_FMT_YUV420P:
+		data = std::make_unique<uint8_t[]>(width * height + 2 * ((width / 2) * (height / 2)));
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				data[i++] = (uint8_t)(x + y + t * 30);
+		for (int y = 0; y < height / 2; y++)
+			for (int x = 0; x < width / 2; x++)
+				data[i++] = (uint8_t)(128 + y + t * 20);
+		for (int y = 0; y < height / 2; y++)
+			for (int x = 0; x < width / 2; x++)
+				data[i++] = (uint8_t)(64 + x + t * 50);
+		break;
+	case AV_PIX_FMT_NV12:
+		data = std::make_unique<uint8_t[]>(width * height + 2 * ((width / 2) * (height / 2)));
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				data[i++] = (uint8_t)(x + y + t * 30);
+		for (int y = 0; y < height / 2; y++) {
+			for (int x = 0; x < width / 2; x++) {
+				data[i++] = (uint8_t)(128 + y + t * 20);
+				data[i++] = (uint8_t)(64 + x + t * 50);
+			}
+		}
+		break;
+	default:
+		LOG->error("unsupported pixel format");
 	}
-	auto t = f->pts * av_q2d(time_base);
-	for (int y = 0; y < f->height; y++)
-		for (int x = 0; x < f->width; x++)
-			f->data[0][y * f->linesize[0] + x] = (uint8_t)(x + y + t * 30);
-	for (int y = 0; y < f->height / 2; y++) {
-		for (int x = 0; x < f->width / 2; x++) {
-			f->data[1][y * f->linesize[1] + 2 * x] = (uint8_t)(128 + y + t * 20);
-			f->data[1][y * f->linesize[1] + 2 * x + 1] = (uint8_t)(64 + x + t * 50);
+	LOG_EXIT;
+	return data;
+};
+
+void CopyFrameData(AVFrame* frame, std::unique_ptr<uint8_t[]>& data, AVPixelFormat pix_fmt) {
+	LOG_ENTER;
+	if (frame->format != pix_fmt) {
+		LOG->error("frame pixel format mismatch");
+	}
+	else {
+		size_t i{ 0 };
+		switch (pix_fmt) {
+		case AV_PIX_FMT_NV12:
+			for (int y = 0; y < frame->height; y++)
+				for (int x = 0; x < frame->width; x++)
+					frame->data[0][y * frame->linesize[0] + x] = data[i++];
+			for (int y = 0; y < frame->height / 2; y++) {
+				for (int x = 0; x < frame->width / 2; x++) {
+					frame->data[1][y * frame->linesize[1] + 2 * x] = data[i++];
+					frame->data[1][y * frame->linesize[1] + 2 * x + 1] = data[i++];
+				}
+			}
+			break;
+		case AV_PIX_FMT_YUV420P:
+			for (int y = 0; y < frame->height; y++)
+				for (int x = 0; x < frame->width; x++)
+					frame->data[0][y * frame->linesize[0] + x] = data[i++];
+			for (int y = 0; y < frame->height / 2; y++)
+				for (int x = 0; x < frame->width / 2; x++)
+					frame->data[1][y * frame->linesize[1] + x] = data[i++];
+			for (int y = 0; y < frame->height / 2; y++)
+				for (int x = 0; x < frame->width / 2; x++)
+					frame->data[2][y * frame->linesize[2] + x] = data[i++];
+			break;
+		default:
+			LOG->error("unsupported pixel format");
 		}
 	}
 	LOG_EXIT;
-}
+};
 
 class VideoStream : public Stream {
 public:
@@ -263,7 +317,7 @@ public:
 	VideoStream(
 		AVFormatContext& format_context, AVCodecID codec_id,
 		int width, int height,
-		int framerate_numerator, int framerate_denominator,
+		const AVRational& frame_rate,
 		AVPixelFormat pix_fmt)
 		: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }, tmp_frame{ nullptr }
 	{
@@ -274,7 +328,7 @@ public:
 			}
 			context->width = width;
 			context->height = height;
-			context->time_base = AVRational{ framerate_denominator, framerate_numerator };
+			context->time_base = av_inv_q(frame_rate);
 			int loss = 0;
 			if (context->codec && context->codec->pix_fmts) {
 				context->pix_fmt = avcodec_find_best_pix_fmt_of_list(context->codec->pix_fmts, pix_fmt, 0, &loss);
@@ -299,7 +353,7 @@ public:
 			int ret = 0;
 			ret = avcodec_open2(context, NULL, NULL);
 			if (ret < 0) {
-				LOG->error(L"failed to open video codec: {}", av2_error_string(ret));
+				LOG->error("failed to open video codec: {}", av2_error_string(ret));
 			}
 			if (stream) {
 				stream->time_base = context->time_base;
@@ -329,15 +383,14 @@ public:
 		LOG_EXIT;
 	}
 
-	// fill frame with NV12 data
-	void NextFrame() {
+	void NextFrame(std::unique_ptr<uint8_t[]>& data) {
 		LOG_ENTER;
 		if (frame) {
 			if (tmp_frame) {
-				FillFrameNV12(tmp_frame, context->time_base);
+				CopyFrameData(tmp_frame, data, pix_fmt);
 				struct SwsContext* sws = sws_getContext(
-					tmp_frame->width, tmp_frame->height, pix_fmt,
-					frame->width, frame->height, context->pix_fmt,
+					tmp_frame->width, tmp_frame->height, (AVPixelFormat)tmp_frame->format,
+					frame->width, frame->height, (AVPixelFormat)frame->format,
 					SWS_BICUBIC, nullptr, nullptr, nullptr);
 				if (!sws) {
 					LOG->error("failed to initialize pixel conversion context");
@@ -353,7 +406,7 @@ public:
 				frame->pts += 1;
 			}
 			else {
-				FillFrameNV12(frame, context->time_base);
+				CopyFrameData(frame, data, pix_fmt);
 				frame->pts += 1;
 			}
 		}
@@ -406,7 +459,7 @@ public:
 			int ret = 0;
 			ret = avcodec_open2(context, NULL, NULL);
 			if (ret < 0) {
-				LOG->error(L"failed to open audio codec: {}", av2_error_string(ret));
+				LOG->error("failed to open audio codec: {}", av2_error_string(ret));
 			}
 			if (stream) {
 				avcodec_parameters_from_context(stream->codecpar, context);
@@ -459,34 +512,33 @@ public:
 	std::unique_ptr<AudioStream> astream;
 	std::unique_ptr<ProcessPacket> process_packet;
 
-	Format() : context{ nullptr }, vstream{ nullptr }, astream{ nullptr }
+	Format(
+		const std::string& filename,
+		AVCodecID vcodec, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
+		AVCodecID acodec, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+		: context{ nullptr }, vstream{ nullptr }, astream{ nullptr }
 	{
 		LOG_ENTER;
-		std::wstring base;
-		auto exportsec = settings->GetSec(L"export");
-		settings->GetVar(exportsec, L"base", base);
-		std::wstring filename{ base + L".mkv" };
-		std::string ufilename{ wstring_to_utf8(filename) };
 		int ret = 0;
-		ret = avformat_alloc_output_context2(&context, NULL, NULL, ufilename.c_str());
+		ret = avformat_alloc_output_context2(&context, NULL, NULL, filename.c_str());
 		if (ret < 0) {
-			LOG->error(L"failed to allocate output context for '{}': {}", filename, av2_error_string(ret));
+			LOG->error("failed to allocate output context for '{}': {}", filename, av2_error_string(ret));
 		}
 		if (context) {
-			vstream.reset(new VideoStream(*context, AV_CODEC_ID_FFV1, 1920, 1080, 30000, 1001, AV_PIX_FMT_NV12));
-			astream.reset(new AudioStream(*context, AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
+			vstream.reset(new VideoStream(*context, vcodec, width, height, frame_rate, pix_fmt));
+			astream.reset(new AudioStream(*context, acodec, sample_fmt, sample_rate, channel_layout));
 			process_packet.reset(new ProcessPacket(*context));
-			av_dump_format(context, 0, ufilename.c_str(), 1);
-			ret = avio_open(&context->pb, ufilename.c_str(), AVIO_FLAG_WRITE);
+			av_dump_format(context, 0, filename.c_str(), 1);
+			ret = avio_open(&context->pb, filename.c_str(), AVIO_FLAG_WRITE);
 			if (ret < 0) {
-				LOG->error(L"failed to open '{}' for writing: {}", filename, av2_error_string(ret));
+				LOG->error("failed to open '{}' for writing: {}", filename, av2_error_string(ret));
 			}
 		}
 		if (context && context->pb) {
 			if (!(context->oformat->flags & AVFMT_NOFILE)) {
 				ret = avformat_write_header(context, NULL);
 				if (ret < 0) {
-					LOG->error(L"failed to write header: {}", av2_error_string(ret));
+					LOG->error("failed to write header: {}", av2_error_string(ret));
 					avio_closep(&context->pb);
 				}
 			}
@@ -516,7 +568,7 @@ public:
 		if (context && context->pb) {
 			int ret = av_write_trailer(context);
 			if (ret < 0) {
-				LOG->error(L"failed to write trailer: {}", av2_error_string(ret));
+				LOG->error("failed to write trailer: {}", av2_error_string(ret));
 			}
 		}
 		vstream = nullptr;
@@ -544,13 +596,24 @@ int main()
 	os.str(L"");
 	settings->generate(os);
 	LOG->trace(L"settings after interpolation:\n{}", os.str());
-	auto format = std::unique_ptr<Format>(new Format{});
+	std::wstring base;
+	auto exportsec = settings->GetSec(L"export");
+	settings->GetVar(exportsec, L"base", base);
+	std::wstring filename{ base + L".mkv" };
+	std::string ufilename{ wstring_to_utf8(filename) };
+	auto format = std::unique_ptr<Format>(new Format(
+		ufilename,
+		AV_CODEC_ID_FFV1, 1920, 1080, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
+		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
 	const auto total_time = 5.0;
 	while (format->astream->frame->pts < total_time * format->astream->context->sample_rate) {
 		format->astream->NextFrame();
 		format->SendAudioFrame();
 		while (format->astream->frame->pts * av_q2d(format->astream->context->time_base) > format->vstream->frame->pts * av_q2d(format->vstream->context->time_base)) {
-			format->vstream->NextFrame();
+			auto frame = format->vstream->frame;
+			auto t = frame->pts * av_q2d(format->vstream->context->time_base);
+			auto data = MakeFrameData(frame->width, frame->height, t, format->vstream->pix_fmt);
+			format->vstream->NextFrame(data);
 			format->SendVideoFrame();
 		}
 	}
