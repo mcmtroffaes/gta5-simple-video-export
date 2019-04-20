@@ -89,11 +89,11 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list vl)
 		}
 		else {
 			// log at the specified level rather than error level to avoid spamming the log
-			LOG->log(av_spdlog_level(level), "failed to format av_log message '{}'", fmt);
+			LOG->log(av_spdlog_level(level), "failed to format av_log message: {}", fmt);
 		}
 	}
 	// only write log message on newline
-	size_t i = strlen(fmt);
+	size_t i = strnlen_s(fmt, sizeof(line));
 	if ((i > 0) && (fmt[i - 1] == '\n')) {
 		// remove newline (spdlog adds a newline automatically)
 		if ((pos > 0) && (line[pos - 1] == '\n')) {
