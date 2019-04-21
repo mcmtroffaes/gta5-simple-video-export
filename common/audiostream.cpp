@@ -78,6 +78,7 @@ AudioStream::AudioStream(AVFormatContext* format_context, AVCodecID codec_id, AV
 
 void AudioStream::Encode(uint8_t* ptr)
 {
+	LOG_ENTER;
 	uint8_t* data[4];
 	int linesize[4];
 	av_samples_fill_arrays(data, linesize, ptr, context->channels, frame->nb_samples, sample_fmt, 1);
@@ -95,7 +96,9 @@ void AudioStream::Encode(uint8_t* ptr)
 
 AudioStream::~AudioStream()
 {
+	LOG_ENTER;
 	if (swr) {
 		swr_free(&swr);
 	}
+	LOG_EXIT;
 }
