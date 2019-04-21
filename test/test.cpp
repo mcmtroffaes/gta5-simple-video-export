@@ -3,6 +3,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/timestamp.h>
 #include <libswscale/swscale.h>
@@ -236,23 +237,11 @@ public:
 	}
 };
 
-auto MakeFrameData(size_t width, size_t height, double t, AVPixelFormat pix_fmt) {
+auto MakeFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
 	LOG_ENTER;
 	std::unique_ptr<uint8_t[]> data{ nullptr };
 	size_t i{ 0 };
 	switch (pix_fmt) {
-	case AV_PIX_FMT_YUV420P:
-		data = std::make_unique<uint8_t[]>(width * height + 2 * ((width / 2) * (height / 2)));
-		for (int y = 0; y < height; y++)
-			for (int x = 0; x < width; x++)
-				data[i++] = (uint8_t)(x + y + t * 30);
-		for (int y = 0; y < height / 2; y++)
-			for (int x = 0; x < width / 2; x++)
-				data[i++] = (uint8_t)(128 + y + t * 20);
-		for (int y = 0; y < height / 2; y++)
-			for (int x = 0; x < width / 2; x++)
-				data[i++] = (uint8_t)(64 + x + t * 50);
-		break;
 	case AV_PIX_FMT_NV12:
 		data = std::make_unique<uint8_t[]>(width * height + 2 * ((width / 2) * (height / 2)));
 		for (int y = 0; y < height; y++)
@@ -265,6 +254,30 @@ auto MakeFrameData(size_t width, size_t height, double t, AVPixelFormat pix_fmt)
 			}
 		}
 		break;
+	case AV_PIX_FMT_YUV420P:
+		data = std::make_unique<uint8_t[]>(width * height + 2 * ((width / 2) * (height / 2)));
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				data[i++] = (uint8_t)(x + y + t * 30);
+		for (int y = 0; y < height / 2; y++)
+			for (int x = 0; x < width / 2; x++)
+				data[i++] = (uint8_t)(128 + y + t * 20);
+		for (int y = 0; y < height / 2; y++)
+			for (int x = 0; x < width / 2; x++)
+				data[i++] = (uint8_t)(64 + x + t * 50);
+		break;
+	case AV_PIX_FMT_YUV444P:
+		data = std::make_unique<uint8_t[]>(3 * width * height);
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				data[i++] = (uint8_t)(x + y + t * 30);
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				data[i++] = (uint8_t)(128 + 0.5 * y + t * 20);
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				data[i++] = (uint8_t)(64 + 0.5 * x + t * 50);
+		break;
 	default:
 		LOG->error("unsupported pixel format");
 	}
@@ -274,37 +287,23 @@ auto MakeFrameData(size_t width, size_t height, double t, AVPixelFormat pix_fmt)
 
 void CopyFrameData(AVFrame* frame, std::unique_ptr<uint8_t[]>& data, AVPixelFormat pix_fmt) {
 	LOG_ENTER;
-	if (frame->format != pix_fmt) {
-		LOG->error("frame pixel format mismatch");
+	struct SwsContext* sws = sws_getContext(
+		frame->width, frame->height, pix_fmt,
+		frame->width, frame->height, (AVPixelFormat)frame->format,
+		SWS_BICUBIC, nullptr, nullptr, nullptr);
+	if (!sws) {
+		LOG->error("failed to initialize pixel conversion context");
 	}
 	else {
-		size_t i{ 0 };
-		switch (pix_fmt) {
-		case AV_PIX_FMT_NV12:
-			for (int y = 0; y < frame->height; y++)
-				for (int x = 0; x < frame->width; x++)
-					frame->data[0][y * frame->linesize[0] + x] = data[i++];
-			for (int y = 0; y < frame->height / 2; y++) {
-				for (int x = 0; x < frame->width / 2; x++) {
-					frame->data[1][y * frame->linesize[1] + 2 * x] = data[i++];
-					frame->data[1][y * frame->linesize[1] + 2 * x + 1] = data[i++];
-				}
-			}
-			break;
-		case AV_PIX_FMT_YUV420P:
-			for (int y = 0; y < frame->height; y++)
-				for (int x = 0; x < frame->width; x++)
-					frame->data[0][y * frame->linesize[0] + x] = data[i++];
-			for (int y = 0; y < frame->height / 2; y++)
-				for (int x = 0; x < frame->width / 2; x++)
-					frame->data[1][y * frame->linesize[1] + x] = data[i++];
-			for (int y = 0; y < frame->height / 2; y++)
-				for (int x = 0; x < frame->width / 2; x++)
-					frame->data[2][y * frame->linesize[2] + x] = data[i++];
-			break;
-		default:
-			LOG->error("unsupported pixel format");
-		}
+		uint8_t* slices[4];
+		int linesizes[4];
+		av_image_fill_linesizes(linesizes, pix_fmt, frame->width);
+		av_image_fill_pointers(slices, pix_fmt, frame->height, data.get(), linesizes);
+		sws_scale(
+			sws,
+			slices, linesizes, 0, frame->height,
+			frame->data, frame->linesize);
+		sws_freeContext(sws);
 	}
 	LOG_EXIT;
 };
@@ -312,14 +311,13 @@ void CopyFrameData(AVFrame* frame, std::unique_ptr<uint8_t[]>& data, AVPixelForm
 class VideoStream : public Stream {
 public:
 	const AVPixelFormat pix_fmt;
-	AVFrame* tmp_frame;
 
 	VideoStream(
 		AVFormatContext& format_context, AVCodecID codec_id,
 		int width, int height,
 		const AVRational& frame_rate,
 		AVPixelFormat pix_fmt)
-		: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }, tmp_frame{ nullptr }
+		: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }
 	{
 		LOG_ENTER;
 		if (context) {
@@ -337,12 +335,9 @@ public:
 				context->pix_fmt = pix_fmt;
 			}
 			if (context->pix_fmt != pix_fmt) {
-				LOG->info("pixel format {} not supported by codec", av_get_pix_fmt_name(pix_fmt));
-				LOG->info("using pixel format {} instead", av_get_pix_fmt_name(context->pix_fmt));
-				tmp_frame = av_frame_alloc();
-				if (!tmp_frame) {
-					LOG->error("failed to allocate conversion frame");
-				}
+				LOG->info(
+					"pixel format {} not supported by codec: using pixel format {} instead",
+					av_get_pix_fmt_name(pix_fmt), av_get_pix_fmt_name(context->pix_fmt));
 			}
 			if (loss) {
 				LOG->warn(
@@ -369,16 +364,6 @@ public:
 					LOG->error("failed to allocate frame buffer");
 				}
 			}
-			if (tmp_frame) {
-				tmp_frame->width = width;
-				tmp_frame->height = height;
-				tmp_frame->format = pix_fmt;
-				tmp_frame->pts = 0;
-				int ret = av_frame_get_buffer(tmp_frame, 32);
-				if (ret < 0) {
-					LOG->error("failed to allocate frame buffer");
-				}
-			}
 		}
 		LOG_EXIT;
 	}
@@ -386,29 +371,8 @@ public:
 	void NextFrame(std::unique_ptr<uint8_t[]>& data) {
 		LOG_ENTER;
 		if (frame) {
-			if (tmp_frame) {
-				CopyFrameData(tmp_frame, data, pix_fmt);
-				struct SwsContext* sws = sws_getContext(
-					tmp_frame->width, tmp_frame->height, (AVPixelFormat)tmp_frame->format,
-					frame->width, frame->height, (AVPixelFormat)frame->format,
-					SWS_BICUBIC, nullptr, nullptr, nullptr);
-				if (!sws) {
-					LOG->error("failed to initialize pixel conversion context");
-				}
-				else {
-					sws_scale(
-						sws,
-						tmp_frame->data, tmp_frame->linesize, 0, tmp_frame->height,
-						frame->data, frame->linesize);
-					sws_freeContext(sws);
-				}
-				tmp_frame->pts += 1;
-				frame->pts += 1;
-			}
-			else {
-				CopyFrameData(frame, data, pix_fmt);
-				frame->pts += 1;
-			}
+			CopyFrameData(frame, data, pix_fmt);
+			frame->pts += 1;
 		}
 		LOG_EXIT;
 	}
@@ -583,7 +547,6 @@ public:
 
 int main()
 {
-	/* load settings without logger, to get log_level and log_flush_on */
 	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
 	settings.reset(new Settings);
 	av_log_set_level(spdlog_av_level(logger->level()));
@@ -601,23 +564,29 @@ int main()
 	settings->GetVar(exportsec, L"base", base);
 	std::wstring filename{ base + L".mkv" };
 	std::string ufilename{ wstring_to_utf8(filename) };
+	LOG->info("export started");
+	auto pix_fmt = AV_PIX_FMT_NV12;
+	auto width = 426;
+	auto height = 240;
 	auto format = std::unique_ptr<Format>(new Format(
 		ufilename,
-		AV_CODEC_ID_FFV1, 1920, 1080, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
+		AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
 		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
 	const auto total_time = 5.0;
 	while (format->astream->frame->pts < total_time * format->astream->context->sample_rate) {
 		format->astream->NextFrame();
 		format->SendAudioFrame();
 		while (format->astream->frame->pts * av_q2d(format->astream->context->time_base) > format->vstream->frame->pts * av_q2d(format->vstream->context->time_base)) {
-			auto frame = format->vstream->frame;
-			auto t = frame->pts * av_q2d(format->vstream->context->time_base);
-			auto data = MakeFrameData(frame->width, frame->height, t, format->vstream->pix_fmt);
-			format->vstream->NextFrame(data);
+			auto & vstream = format->vstream;
+			auto t = vstream->frame->pts * av_q2d(vstream->context->time_base);
+			auto data = MakeFrameData(width, height, pix_fmt, t);
+			CopyFrameData(vstream->frame, data, pix_fmt);
 			format->SendVideoFrame();
+			vstream->frame->pts += 1;
 		}
 	}
 	format = nullptr;
+	LOG->info("export finished");
 	LOG_EXIT;
 	std::cin.get();
 }
