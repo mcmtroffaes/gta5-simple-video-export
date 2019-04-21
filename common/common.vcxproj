@@ -22,11 +22,13 @@
     <ClInclude Include="logger.h" />
     <ClInclude Include="settings.h" />
     <ClInclude Include="stream.h" />
+    <ClInclude Include="videostream.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="settings.cpp" />
     <ClCompile Include="stream.cpp" />
+    <ClCompile Include="videostream.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
