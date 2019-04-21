@@ -293,18 +293,14 @@ public:
 
 	~Format() {
 		LOG_ENTER;
-		if (context) {
-			if (vstream) vstream->Flush(context);
-			if (astream) astream->Flush(context);
-		}
+		vstream = nullptr;
+		astream = nullptr;
 		if (context && context->pb) {
 			int ret = av_write_trailer(context);
 			if (ret < 0) {
 				LOG->error("failed to write trailer: {}", AVErrorString(ret));
 			}
 		}
-		vstream = nullptr;
-		astream = nullptr;
 		if (context) {
 			avio_closep(&context->pb);
 			avformat_free_context(context);
@@ -342,13 +338,13 @@ int main()
 	while (format->astream->Time() < 5.0) {
 		auto & astream = format->astream;
 		astream->NextFrame();
-		astream->SendFrame(format->context);
+		astream->SendFrame();
 		while (format->astream->Time() > format->vstream->Time()) {
 			auto & vstream = format->vstream;
 			auto t = vstream->frame->pts * av_q2d(vstream->context->time_base);
 			auto data = MakeVideoFrameData(width, height, pix_fmt, t);
 			vstream->MakeFrame(data.get());
-			vstream->SendFrame(format->context);
+			vstream->SendFrame();
 			vstream->frame->pts += 1;
 		}
 	}
