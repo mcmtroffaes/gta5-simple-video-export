@@ -83,7 +83,7 @@ public:
 	const AVPixelFormat pix_fmt;
 
 	VideoStream(
-		AVFormatContext& format_context, AVCodecID codec_id,
+		AVFormatContext* format_context, AVCodecID codec_id,
 		int width, int height,
 		const AVRational& frame_rate,
 		AVPixelFormat pix_fmt)
@@ -179,7 +179,7 @@ public:
 	AVFrame* tmp_frame;
 
 	AudioStream(
-		AVFormatContext& format_context, AVCodecID codec_id,
+		AVFormatContext* format_context, AVCodecID codec_id,
 		AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 		: Stream{ format_context, codec_id }, sample_fmt{ sample_fmt }, tmp_frame{ nullptr }
 	{
@@ -271,8 +271,8 @@ public:
 			LOG->error("failed to allocate output context for '{}': {}", filename, AVErrorString(ret));
 		}
 		if (context) {
-			vstream.reset(new VideoStream(*context, vcodec, width, height, frame_rate, pix_fmt));
-			astream.reset(new AudioStream(*context, acodec, sample_fmt, sample_rate, channel_layout));
+			vstream.reset(new VideoStream(context, vcodec, width, height, frame_rate, pix_fmt));
+			astream.reset(new AudioStream(context, acodec, sample_fmt, sample_rate, channel_layout));
 			av_dump_format(context, 0, filename.c_str(), 1);
 			ret = avio_open(&context->pb, filename.c_str(), AVIO_FLAG_WRITE);
 			if (ret < 0) {
