@@ -11,8 +11,7 @@ extern "C" {
 }
 
 #include "settings.h"
-#include "videostream.h"
-#include "audiostream.h"
+#include "format.h"
 
 #pragma comment(lib, "common.lib")
 
@@ -92,6 +91,7 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 		rawdata[j] = sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time));
 	}
 	int16_t* q_s16 = (int16_t*)data.get();
+	float* q_flt = (float*)data.get();
 	switch (sample_fmt) {
 	case (AV_SAMPLE_FMT_S16):
 		for (int j = 0; j < nb_samples; j++)
@@ -101,7 +101,17 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	case (AV_SAMPLE_FMT_S16P):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				* q_s16++ = (int)(10000 * rawdata[j]);
+				*q_s16++ = (int)(10000 * rawdata[j]);
+		break;
+	case (AV_SAMPLE_FMT_FLT):
+		for (int j = 0; j < nb_samples; j++)
+			for (int k = 0; k < channels; k++)
+				*q_flt++ = 0.3 * rawdata[j];
+		break;
+	case (AV_SAMPLE_FMT_FLTP):
+		for (int k = 0; k < channels; k++)
+			for (int j = 0; j < nb_samples; j++)
+				*q_flt++ = 0.3 * rawdata[j];
 		break;
 	default:
 		LOG->error("unsupported sample format");
@@ -110,63 +120,6 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	LOG_EXIT;
 	return data;
 }
-
-class Format {
-public:
-	AVFormatContext* context;
-	std::unique_ptr<VideoStream> vstream;
-	std::unique_ptr<AudioStream> astream;
-
-	Format(
-		const std::string& filename,
-		AVCodecID vcodec, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
-		AVCodecID acodec, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-		: context{ nullptr }, vstream{ nullptr }, astream{ nullptr }
-	{
-		LOG_ENTER;
-		int ret = 0;
-		ret = avformat_alloc_output_context2(&context, NULL, NULL, filename.c_str());
-		if (ret < 0) {
-			LOG->error("failed to allocate output context for '{}': {}", filename, AVErrorString(ret));
-		}
-		if (context) {
-			vstream.reset(new VideoStream(context, vcodec, width, height, frame_rate, pix_fmt));
-			astream.reset(new AudioStream(context, acodec, sample_fmt, sample_rate, channel_layout));
-			av_dump_format(context, 0, filename.c_str(), 1);
-			ret = avio_open(&context->pb, filename.c_str(), AVIO_FLAG_WRITE);
-			if (ret < 0) {
-				LOG->error("failed to open '{}' for writing: {}", filename, AVErrorString(ret));
-			}
-		}
-		if (context && context->pb) {
-			if (!(context->oformat->flags & AVFMT_NOFILE)) {
-				ret = avformat_write_header(context, NULL);
-				if (ret < 0) {
-					LOG->error("failed to write header: {}", AVErrorString(ret));
-					avio_closep(&context->pb);
-				}
-			}
-		}
-		LOG_EXIT;
-	}
-
-	~Format() {
-		LOG_ENTER;
-		vstream = nullptr;
-		astream = nullptr;
-		if (context && context->pb) {
-			int ret = av_write_trailer(context);
-			if (ret < 0) {
-				LOG->error("failed to write trailer: {}", AVErrorString(ret));
-			}
-		}
-		if (context) {
-			avio_closep(&context->pb);
-			avformat_free_context(context);
-		}
-		LOG_EXIT;
-	}
-};
 
 int main()
 {
@@ -187,14 +140,14 @@ int main()
 	std::wstring filename{ base + L".mkv" };
 	std::string ufilename{ wstring_to_utf8(filename) };
 	LOG->info("export started");
-	auto pix_fmt = AV_PIX_FMT_YUV420P;
+	auto pix_fmt = AV_PIX_FMT_NV12;
 	auto width = 426;
 	auto height = 240;
-	auto sample_fmt = AV_SAMPLE_FMT_S16;
+	auto sample_fmt = AV_SAMPLE_FMT_FLT;
 	auto format = std::unique_ptr<Format>(new Format(
 		ufilename,
 		AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
-		AV_CODEC_ID_AAC, sample_fmt, 44100, AV_CH_LAYOUT_STEREO));
+		AV_CODEC_ID_FLAC, sample_fmt, 44100, AV_CH_LAYOUT_STEREO));
 	while (format->astream->Time() < 5.0) {
 		while (format->vstream->Time() >= format->astream->Time()) {
 			auto adata = MakeAudioData(

@@ -30,6 +30,9 @@
     <ClInclude Include="audiostream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="format.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="logger.cpp">
@@ -45,6 +48,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="audiostream.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="format.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
