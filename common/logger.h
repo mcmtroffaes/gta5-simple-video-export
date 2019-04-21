@@ -20,6 +20,9 @@ void AVLogSetLevel(spdlog::level::level_enum level);
 // call this once at the start of your application
 void AVLogSetCallback();
 
+// convert ffmpeg errnum to std::string
+std::string AVErrorString(int errnum);
+
 #define LOG if (logger) logger
 #define LOG_ENTER LOG->trace("{}: enter", __func__)
 #define LOG_EXIT LOG->trace("{}: exit", __func__)

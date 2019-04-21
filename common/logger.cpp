@@ -123,3 +123,9 @@ void AVLogSetCallback()
 {
 	av_log_set_callback(AVLogCallback);
 }
+
+std::string AVErrorString(int errnum) {
+	char buffer[AV_ERROR_MAX_STRING_SIZE] = { 0 };
+	av_make_error_string(buffer, sizeof(buffer), errnum);
+	return std::string(buffer);
+}

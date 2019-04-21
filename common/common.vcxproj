@@ -21,10 +21,12 @@
   <ItemGroup>
     <ClInclude Include="logger.h" />
     <ClInclude Include="settings.h" />
+    <ClInclude Include="stream.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="settings.cpp" />
+    <ClCompile Include="stream.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

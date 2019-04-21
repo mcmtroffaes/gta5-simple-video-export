@@ -11,6 +11,7 @@ extern "C" {
 }
 
 #include "settings.h"
+#include "stream.h"
 
 #pragma comment(lib, "common.lib")
 
@@ -28,132 +29,6 @@ std::wstring wstring_from_utf8(const std::string& str)
 	std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
 	return myconv.from_bytes(str);
 }
-
-auto av2_error_string(int errnum) {
-	char buffer[AV_ERROR_MAX_STRING_SIZE] = { 0 };
-	av_make_error_string(buffer, sizeof(buffer), errnum);
-	return std::string(buffer);
-}
-
-auto av2_ts_string(uint64_t ts) {
-	char buffer[AV_TS_MAX_STRING_SIZE] = { 0 };
-	av_ts_make_string(buffer, ts);
-	return std::string(buffer);
-}
-
-auto av2_ts_time_string(uint64_t ts, AVRational *tb) {
-	char buffer[AV_TS_MAX_STRING_SIZE] = { 0 };
-	av_ts_make_time_string(buffer, ts, tb);
-	return std::string(buffer);
-}
-
-class Stream {
-public:
-	AVStream* stream;
-	AVCodecContext* context;
-	AVFrame* frame;
-
-	Stream(AVFormatContext& format_context, AVCodecID codec_id) :
-		stream{ nullptr }, context{ nullptr }, frame{ nullptr }
-	{
-		LOG_ENTER;
-		const AVCodec* codec = avcodec_find_encoder(codec_id);
-		if (!codec) {
-			LOG->error("failed to find encoder with codec id {}", codec_id);
-		}
-		else {
-			stream = avformat_new_stream(&format_context, codec);
-			if (!stream) {
-				LOG->error("failed to allocate stream for codec {}", codec->name);
-			}
-			context = avcodec_alloc_context3(codec);
-			if (!context) {
-				LOG->error("failed to allocate context for codec {}", codec->name);
-			}
-			frame = av_frame_alloc();
-			if (!frame) {
-				LOG->error("failed to allocate frame");
-			}
-			else {
-				frame->pts = 0;
-			}
-		}
-		LOG_EXIT;
-	}
-
-	void SendFrame(AVFormatContext* format_context) {
-		LOG_ENTER;
-		AVPacket pkt;
-		if (!context || !stream) // frame can be null (e.g. on flush)
-			return;
-		av_init_packet(&pkt);
-		// send frame for encoding
-		int ret_frame = avcodec_send_frame(context, frame);
-		if (ret_frame < 0) {
-			LOG->error("failed to send frame to encoder: {}", av2_error_string(ret_frame));
-		}
-		else {
-			// get next packet from encoder
-			int ret_packet = avcodec_receive_packet(context, &pkt);
-			while (!ret_packet) { // ret_packet == 0 denotes success, keep writing as long as we have success
-				// we have to set the correct stream index
-				pkt.stream_index = stream->index;
-				// we need to rescale the packet from the context time base to the stream time base
-				av_packet_rescale_ts(&pkt, context->time_base, stream->time_base);
-				// process the frame
-				AVRational* time_base = &format_context->streams[pkt.stream_index]->time_base;
-				LOG->debug(
-					"pts:{} pts_time:{} dts:{} dts_time:{} duration:{} duration_time:{} stream_index:{}",
-					av2_ts_string(pkt.pts), av2_ts_time_string(pkt.pts, time_base),
-					av2_ts_string(pkt.dts), av2_ts_time_string(pkt.dts, time_base),
-					av2_ts_string(pkt.duration), av2_ts_time_string(pkt.duration, time_base),
-					pkt.stream_index);
-				int ret_write = av_interleaved_write_frame(format_context, &pkt);
-				if (ret_write < 0) {
-					LOG->error("failed to write packet to stream: {}", av2_error_string(ret_write));
-				}
-				// clean up reference
-				av_packet_unref(&pkt);
-				// get next packet from encoder
-				ret_packet = avcodec_receive_packet(context, &pkt);
-			}
-			if (ret_packet != AVERROR(EAGAIN) && (ret_packet != AVERROR_EOF)) {
-				LOG->error("failed to receive packet from encoder: {}", av2_error_string(ret_packet));
-			}
-		}
-		LOG_EXIT;
-	}
-
-	void Flush(AVFormatContext* format_context) {
-		LOG_ENTER;
-		if (frame) {
-			av_frame_free(&frame);
-			SendFrame(format_context);
-		}
-		LOG_EXIT;
-	}
-
-	auto Time() const {
-		if (frame && context) {
-			return frame->pts * av_q2d(context->time_base);
-		}
-		else {
-			return 0.0;
-		}
-	}
-
-	~Stream() {
-		LOG_ENTER;
-		if (frame) {
-			av_frame_free(&frame);
-		}
-		if (context) {
-			avcodec_free_context(&context);
-		}
-		stream = nullptr;
-		LOG_EXIT;
-	}
-};
 
 auto MakeVideoFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
 	LOG_ENTER;
@@ -243,7 +118,7 @@ public:
 			int ret = 0;
 			ret = avcodec_open2(context, NULL, NULL);
 			if (ret < 0) {
-				LOG->error("failed to open video codec: {}", av2_error_string(ret));
+				LOG->error("failed to open video codec: {}", AVErrorString(ret));
 			}
 			if (stream) {
 				stream->time_base = context->time_base;
@@ -332,7 +207,7 @@ public:
 			int ret = 0;
 			ret = avcodec_open2(context, NULL, NULL);
 			if (ret < 0) {
-				LOG->error("failed to open audio codec: {}", av2_error_string(ret));
+				LOG->error("failed to open audio codec: {}", AVErrorString(ret));
 			}
 			if (stream) {
 				avcodec_parameters_from_context(stream->codecpar, context);
@@ -393,7 +268,7 @@ public:
 		int ret = 0;
 		ret = avformat_alloc_output_context2(&context, NULL, NULL, filename.c_str());
 		if (ret < 0) {
-			LOG->error("failed to allocate output context for '{}': {}", filename, av2_error_string(ret));
+			LOG->error("failed to allocate output context for '{}': {}", filename, AVErrorString(ret));
 		}
 		if (context) {
 			vstream.reset(new VideoStream(*context, vcodec, width, height, frame_rate, pix_fmt));
@@ -401,14 +276,14 @@ public:
 			av_dump_format(context, 0, filename.c_str(), 1);
 			ret = avio_open(&context->pb, filename.c_str(), AVIO_FLAG_WRITE);
 			if (ret < 0) {
-				LOG->error("failed to open '{}' for writing: {}", filename, av2_error_string(ret));
+				LOG->error("failed to open '{}' for writing: {}", filename, AVErrorString(ret));
 			}
 		}
 		if (context && context->pb) {
 			if (!(context->oformat->flags & AVFMT_NOFILE)) {
 				ret = avformat_write_header(context, NULL);
 				if (ret < 0) {
-					LOG->error("failed to write header: {}", av2_error_string(ret));
+					LOG->error("failed to write header: {}", AVErrorString(ret));
 					avio_closep(&context->pb);
 				}
 			}
@@ -425,7 +300,7 @@ public:
 		if (context && context->pb) {
 			int ret = av_write_trailer(context);
 			if (ret < 0) {
-				LOG->error("failed to write trailer: {}", av2_error_string(ret));
+				LOG->error("failed to write trailer: {}", AVErrorString(ret));
 			}
 		}
 		vstream = nullptr;
