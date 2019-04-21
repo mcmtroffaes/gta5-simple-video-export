@@ -16,7 +16,6 @@ extern "C" {
 
 std::shared_ptr<spdlog::logger> logger = nullptr;
 std::unique_ptr<Settings> settings = nullptr;
-std::mutex av_log_mutex;
 
 std::string wstring_to_utf8(const std::wstring& str)
 {
