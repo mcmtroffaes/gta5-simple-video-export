@@ -41,7 +41,7 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 			LOG->error("failed to open video codec: {}", AVErrorString(ret));
 		}
 		if (stream) {
-			stream->time_base = context->time_base;
+			stream->time_base = context->time_base; // just a hint, avformat_write_header may change stream->time_base
 			avcodec_parameters_from_context(stream->codecpar, context);
 		}
 		if (frame) {
