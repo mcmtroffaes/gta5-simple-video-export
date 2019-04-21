@@ -151,11 +151,14 @@ public:
 			if (!frame) {
 				LOG->error("failed to allocate frame");
 			}
+			else {
+				frame->pts = 0;
+			}
 		}
 		LOG_EXIT;
 	}
 
-	void ProcessFrame(AVFormatContext* format_context) {
+	void SendFrame(AVFormatContext* format_context) {
 		LOG_ENTER;
 		AVPacket pkt;
 		if (!context || !stream) // frame can be null (e.g. on flush)
@@ -202,9 +205,18 @@ public:
 		LOG_ENTER;
 		if (frame) {
 			av_frame_free(&frame);
-			ProcessFrame(format_context);
+			SendFrame(format_context);
 		}
 		LOG_EXIT;
+	}
+
+	auto Time() const {
+		if (frame && context) {
+			return frame->pts * av_q2d(context->time_base);
+		}
+		else {
+			return 0.0;
+		}
 	}
 
 	~Stream() {
@@ -268,29 +280,6 @@ auto MakeVideoFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, doub
 	return data;
 };
 
-void CopyFrameData(AVFrame* frame, uint8_t* ptr, AVPixelFormat pix_fmt) {
-	LOG_ENTER;
-	struct SwsContext* sws = sws_getContext(
-		frame->width, frame->height, pix_fmt,
-		frame->width, frame->height, (AVPixelFormat)frame->format,
-		SWS_BICUBIC, nullptr, nullptr, nullptr);
-	if (!sws) {
-		LOG->error("failed to initialize pixel conversion context");
-	}
-	else {
-		uint8_t* data[4];
-		int linesize[4];
-		av_image_fill_linesizes(linesize, pix_fmt, frame->width);
-		av_image_fill_pointers(data, pix_fmt, frame->height, ptr, linesize);
-		sws_scale(
-			sws,
-			data, linesize, 0, frame->height,
-			frame->data, frame->linesize);
-		sws_freeContext(sws);
-	}
-	LOG_EXIT;
-};
-
 class VideoStream : public Stream {
 public:
 	const AVPixelFormat pix_fmt;
@@ -341,7 +330,6 @@ public:
 				frame->width = width;
 				frame->height = height;
 				frame->format = context->pix_fmt;
-				frame->pts = 0;
 				int ret = av_frame_get_buffer(frame, 32);
 				if (ret < 0) {
 					LOG->error("failed to allocate frame buffer");
@@ -350,6 +338,29 @@ public:
 		}
 		LOG_EXIT;
 	}
+
+	void MakeFrame(uint8_t* ptr) {
+		LOG_ENTER;
+		struct SwsContext* sws = sws_getContext(
+			frame->width, frame->height, pix_fmt,
+			frame->width, frame->height, context->pix_fmt,
+			SWS_BICUBIC, nullptr, nullptr, nullptr);
+		if (!sws) {
+			LOG->error("failed to initialize pixel conversion context");
+		}
+		else {
+			uint8_t* data[4];
+			int linesize[4];
+			av_image_fill_linesizes(linesize, pix_fmt, frame->width);
+			av_image_fill_pointers(data, pix_fmt, frame->height, ptr, linesize);
+			sws_scale(
+				sws,
+				data, linesize, 0, frame->height,
+				frame->data, frame->linesize);
+			sws_freeContext(sws);
+		}
+		LOG_EXIT;
+	};
 };
 
 AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, AVSampleFormat sample_fmt) {
@@ -412,7 +423,6 @@ public:
 				frame->sample_rate = sample_rate;
 				frame->channel_layout = channel_layout;
 				frame->nb_samples = (context->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) ? 1000 : context->frame_size;
-				frame->pts = 0;
 				LOG->debug("audio buffer size is {}", frame->nb_samples);
 				int ret = av_frame_get_buffer(frame, 32);
 				if (ret < 0) {
@@ -532,17 +542,16 @@ int main()
 		ufilename,
 		AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
 		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
-	const auto total_time = 5.0;
-	while (format->astream->frame->pts < total_time * format->astream->context->sample_rate) {
+	while (format->astream->Time() < 5.0) {
 		auto & astream = format->astream;
 		astream->NextFrame();
-		astream->ProcessFrame(format->context);
-		while (format->astream->frame->pts * av_q2d(format->astream->context->time_base) > format->vstream->frame->pts * av_q2d(format->vstream->context->time_base)) {
+		astream->SendFrame(format->context);
+		while (format->astream->Time() > format->vstream->Time()) {
 			auto & vstream = format->vstream;
 			auto t = vstream->frame->pts * av_q2d(vstream->context->time_base);
 			auto data = MakeVideoFrameData(width, height, pix_fmt, t);
-			CopyFrameData(vstream->frame, data.get(), pix_fmt);
-			vstream->ProcessFrame(format->context);
+			vstream->MakeFrame(data.get());
+			vstream->SendFrame(format->context);
 			vstream->frame->pts += 1;
 		}
 	}
