@@ -31,7 +31,7 @@ std::wstring wstring_from_utf8(const std::string& str)
 	return myconv.from_bytes(str);
 }
 
-auto MakeVideoFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
+auto MakeVideoData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
 	LOG_ENTER;
 	std::unique_ptr<uint8_t[]> data{ nullptr };
 	size_t i{ 0 };
@@ -78,6 +78,38 @@ auto MakeVideoFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, doub
 	LOG_EXIT;
 	return data;
 };
+
+auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout, size_t nb_samples, uint64_t pts) {
+	LOG_ENTER;
+	const auto freq1 = 220.0;
+	const auto freq2 = 220.0 * 5.0 / 4.0; // perfect third
+	const auto delta = 0.5;
+	const auto channels = av_get_channel_layout_nb_channels(channel_layout);
+	auto data{ std::make_unique<uint8_t[]>(av_samples_get_buffer_size(NULL, channels, nb_samples, sample_fmt, 1)) };
+	auto rawdata{ std::make_unique<double[]>(nb_samples) };
+	for (int j = 0; j < nb_samples; j++) {
+		auto two_pi_time = (2.0 * M_PI * (pts + j)) / sample_rate;
+		rawdata[j] = sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time));
+	}
+	int16_t* q_s16 = (int16_t*)data.get();
+	switch (sample_fmt) {
+	case (AV_SAMPLE_FMT_S16):
+		for (int j = 0; j < nb_samples; j++)
+			for (int k = 0; k < channels; k++)
+				*q_s16++ = (int)(10000 * rawdata[j]);
+		break;
+	case (AV_SAMPLE_FMT_S16P):
+		for (int k = 0; k < channels; k++)
+			for (int j = 0; j < nb_samples; j++)
+				* q_s16++ = (int)(10000 * rawdata[j]);
+		break;
+	default:
+		LOG->error("unsupported sample format");
+		break;
+	}
+	LOG_EXIT;
+	return data;
+}
 
 class Format {
 public:
@@ -158,16 +190,23 @@ int main()
 	auto pix_fmt = AV_PIX_FMT_YUV420P;
 	auto width = 426;
 	auto height = 240;
+	auto sample_fmt = AV_SAMPLE_FMT_S16;
 	auto format = std::unique_ptr<Format>(new Format(
 		ufilename,
 		AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
-		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 44100, AV_CH_LAYOUT_STEREO));
+		AV_CODEC_ID_AAC, sample_fmt, 44100, AV_CH_LAYOUT_STEREO));
 	while (format->astream->Time() < 5.0) {
-		auto & astream = format->astream;
-		astream->Encode();
-		while (format->astream->Time() > format->vstream->Time()) {
-			auto data = MakeVideoFrameData(width, height, pix_fmt, format->vstream->Time());
-			format->vstream->Encode(data.get());
+		while (format->vstream->Time() >= format->astream->Time()) {
+			auto adata = MakeAudioData(
+				sample_fmt, 44100, AV_CH_LAYOUT_STEREO,
+				format->astream->frame->nb_samples, format->astream->frame->pts);
+			format->astream->Encode(adata.get());
+		}
+		while (format->astream->Time() >= format->vstream->Time()) {
+			auto vdata = MakeVideoData(
+				width, height, pix_fmt,
+				format->vstream->Time());
+			format->vstream->Encode(vdata.get());
 		}
 	}
 	format = nullptr;

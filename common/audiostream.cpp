@@ -13,7 +13,7 @@ AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, A
 }
 
 AudioStream::AudioStream(AVFormatContext* format_context, AVCodecID codec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-	: Stream{ format_context, codec_id }, sample_fmt{ sample_fmt }
+	: Stream{ format_context, codec_id }, sample_fmt{ sample_fmt }, swr{ nullptr }
 {
 	LOG_ENTER;
 	if (context && context->codec_type != AVMEDIA_TYPE_AUDIO) {
@@ -49,35 +49,53 @@ AudioStream::AudioStream(AVFormatContext* format_context, AVCodecID codec_id, AV
 			stream->time_base = context->time_base;
 		}
 		if (frame && context->codec) {
-			frame->format = sample_fmt;
-			frame->sample_rate = sample_rate;
-			frame->channel_layout = channel_layout;
+			frame->format = context->sample_fmt;
+			frame->sample_rate = context->sample_rate;
+			frame->channel_layout = context->channel_layout;
+			frame->channels = context->channels;
 			frame->nb_samples = (context->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) ? 1000 : context->frame_size;
 			LOG->debug("audio buffer size is {}", frame->nb_samples);
-			int ret = av_frame_get_buffer(frame, 32);
+			int ret = av_frame_get_buffer(frame, 0);
 			if (ret < 0) {
 				LOG->error("failed to allocate frame buffer");
 			}
+		}
+		swr = swr_alloc_set_opts(
+			NULL,
+			context->channel_layout, context->sample_fmt, context->sample_rate, // out
+			channel_layout,          sample_fmt,          sample_rate,          // in
+			0, NULL);
+		if (!swr) {
+			LOG->error("failed to allocate resampling context");
+		}
+		ret = swr_init(swr);
+		if (ret < 0) {
+			LOG->error("failed to initialize resampling context");
 		}
 	}
 	LOG_EXIT;
 }
 
-void AudioStream::Encode()
+void AudioStream::Encode(uint8_t* ptr)
 {
-	const auto freq1 = 220.0;
-	const auto freq2 = 220.0 * 5.0 / 4.0; // perfect third
-	const auto delta = 0.5;
-	LOG_ENTER;
-	int16_t* q = (int16_t*)frame->data[0];
-	for (int j = 0; j < frame->nb_samples; j++) {
-		auto two_pi_time = (2.0 * M_PI * (frame->pts + j)) / frame->sample_rate;
-		int v = (int)(10000 * sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time)));
-		for (int i = 0; i < frame->channels; i++) {
-			*q++ = v;
-		}
+	uint8_t* data[4];
+	int linesize[4];
+	av_samples_fill_arrays(data, linesize, ptr, context->channels, frame->nb_samples, sample_fmt, 1);
+	int ret = swr_convert(swr, frame->data, frame->nb_samples, (const uint8_t **)data, frame->nb_samples);
+	if (ret < 0) {
+		LOG->error("resampling error: {}", AVErrorString(ret));
 	}
+	else if (frame->nb_samples != ret) {
+		LOG->error("expected {} samples but got {}", frame->nb_samples, ret);
+	};
 	Stream::Encode();
 	frame->pts += frame->nb_samples;
 	LOG_EXIT;
+}
+
+AudioStream::~AudioStream()
+{
+	if (swr) {
+		swr_free(&swr);
+	}
 }

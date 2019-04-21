@@ -51,7 +51,7 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 			frame->width = width;
 			frame->height = height;
 			frame->format = context->pix_fmt;
-			int ret = av_frame_get_buffer(frame, 32);
+			int ret = av_frame_get_buffer(frame, 0);
 			if (ret < 0) {
 				LOG->error("failed to allocate frame buffer");
 			}
@@ -65,7 +65,7 @@ void VideoStream::Encode(uint8_t* ptr)
 	LOG_ENTER;
 	// fill frame with data given in ptr
 	// we use sws_scale to do this, this will also take care of any pixel format conversions
-	struct SwsContext* sws = sws_getContext(
+	SwsContext* sws = sws_getContext(
 		frame->width, frame->height, pix_fmt,
 		frame->width, frame->height, context->pix_fmt,
 		SWS_BICUBIC, nullptr, nullptr, nullptr);
@@ -75,8 +75,14 @@ void VideoStream::Encode(uint8_t* ptr)
 	else {
 		uint8_t* data[4];
 		int linesize[4];
-		av_image_fill_linesizes(linesize, pix_fmt, frame->width);
-		av_image_fill_pointers(data, pix_fmt, frame->height, ptr, linesize);
+		int ret = av_image_fill_linesizes(linesize, pix_fmt, frame->width);
+		if (ret < 0) {
+			LOG->error("failed to get image line sizes");
+		}
+		ret = av_image_fill_pointers(data, pix_fmt, frame->height, ptr, linesize);
+		if (ret < 0) {
+			LOG->error("failed to get image pointers");
+		}
 		sws_scale(
 			sws,
 			data, linesize, 0, frame->height,
