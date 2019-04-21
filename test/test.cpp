@@ -237,7 +237,7 @@ public:
 	}
 };
 
-auto MakeFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
+auto MakeVideoFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
 	LOG_ENTER;
 	std::unique_ptr<uint8_t[]> data{ nullptr };
 	size_t i{ 0 };
@@ -285,7 +285,7 @@ auto MakeFrameData(size_t width, size_t height, AVPixelFormat pix_fmt, double t)
 	return data;
 };
 
-void CopyFrameData(AVFrame* frame, std::unique_ptr<uint8_t[]>& data, AVPixelFormat pix_fmt) {
+void CopyFrameData(AVFrame* frame, uint8_t* ptr, AVPixelFormat pix_fmt) {
 	LOG_ENTER;
 	struct SwsContext* sws = sws_getContext(
 		frame->width, frame->height, pix_fmt,
@@ -295,13 +295,13 @@ void CopyFrameData(AVFrame* frame, std::unique_ptr<uint8_t[]>& data, AVPixelForm
 		LOG->error("failed to initialize pixel conversion context");
 	}
 	else {
-		uint8_t* slices[4];
-		int linesizes[4];
-		av_image_fill_linesizes(linesizes, pix_fmt, frame->width);
-		av_image_fill_pointers(slices, pix_fmt, frame->height, data.get(), linesizes);
+		uint8_t* data[4];
+		int linesize[4];
+		av_image_fill_linesizes(linesize, pix_fmt, frame->width);
+		av_image_fill_pointers(data, pix_fmt, frame->height, ptr, linesize);
 		sws_scale(
 			sws,
-			slices, linesizes, 0, frame->height,
+			data, linesize, 0, frame->height,
 			frame->data, frame->linesize);
 		sws_freeContext(sws);
 	}
@@ -336,7 +336,7 @@ public:
 			}
 			if (context->pix_fmt != pix_fmt) {
 				LOG->info(
-					"pixel format {} not supported by codec: using pixel format {} instead",
+					"pixel format {} not supported by codec so using {} instead",
 					av_get_pix_fmt_name(pix_fmt), av_get_pix_fmt_name(context->pix_fmt));
 			}
 			if (loss) {
@@ -364,15 +364,6 @@ public:
 					LOG->error("failed to allocate frame buffer");
 				}
 			}
-		}
-		LOG_EXIT;
-	}
-
-	void NextFrame(std::unique_ptr<uint8_t[]>& data) {
-		LOG_ENTER;
-		if (frame) {
-			CopyFrameData(frame, data, pix_fmt);
-			frame->pts += 1;
 		}
 		LOG_EXIT;
 	}
@@ -413,8 +404,9 @@ public:
 				context->sample_fmt = sample_fmt;
 			}
 			if (context->sample_fmt != sample_fmt) {
-				LOG->info("sample format {} not supported by codec", av_get_sample_fmt_name(sample_fmt));
-				LOG->info("using sample format {} instead", av_get_sample_fmt_name(context->sample_fmt));
+				LOG->info(
+					"sample format {} not supported by codec so using {} instead",
+					av_get_sample_fmt_name(sample_fmt), av_get_sample_fmt_name(context->sample_fmt));
 			}
 			context->sample_rate = sample_rate;
 			context->channel_layout = channel_layout;
@@ -579,8 +571,8 @@ int main()
 		while (format->astream->frame->pts * av_q2d(format->astream->context->time_base) > format->vstream->frame->pts * av_q2d(format->vstream->context->time_base)) {
 			auto & vstream = format->vstream;
 			auto t = vstream->frame->pts * av_q2d(vstream->context->time_base);
-			auto data = MakeFrameData(width, height, pix_fmt, t);
-			CopyFrameData(vstream->frame, data, pix_fmt);
+			auto data = MakeVideoFrameData(width, height, pix_fmt, t);
+			CopyFrameData(vstream->frame, data.get(), pix_fmt);
 			format->SendVideoFrame();
 			vstream->frame->pts += 1;
 		}
