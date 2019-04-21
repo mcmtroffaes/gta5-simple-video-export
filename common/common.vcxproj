@@ -19,12 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="audiostream.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="settings.h" />
     <ClInclude Include="stream.h" />
     <ClInclude Include="videostream.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="audiostream.cpp" />
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="settings.cpp" />
     <ClCompile Include="stream.cpp" />

@@ -41,8 +41,11 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 			LOG->error("failed to open video codec: {}", AVErrorString(ret));
 		}
 		if (stream) {
-			stream->time_base = context->time_base; // just a hint, avformat_write_header may change stream->time_base
 			avcodec_parameters_from_context(stream->codecpar, context);
+			// note: this is only a hint, actual stream time_base can be different
+			// avformat_write_header will set the final stream time_base
+			// see https://ffmpeg.org/doxygen/trunk/structAVStream.html#a9db755451f14e2bf590d4b85d82b32e6
+			stream->time_base = context->time_base;
 		}
 		if (frame) {
 			frame->width = width;
@@ -57,9 +60,11 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 	LOG_EXIT;
 }
 
-void VideoStream::MakeFrame(uint8_t* ptr)
+void VideoStream::Encode(uint8_t* ptr)
 {
 	LOG_ENTER;
+	// fill frame with data given in ptr
+	// we use sws_scale to do this, this will also take care of any pixel format conversions
 	struct SwsContext* sws = sws_getContext(
 		frame->width, frame->height, pix_fmt,
 		frame->width, frame->height, context->pix_fmt,
@@ -78,5 +83,7 @@ void VideoStream::MakeFrame(uint8_t* ptr)
 			frame->data, frame->linesize);
 		sws_freeContext(sws);
 	}
+	Stream::Encode();
+	frame->pts += 1;
 	LOG_EXIT;
 }
