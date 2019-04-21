@@ -1,5 +1,9 @@
 #include "stream.h"
 
+extern "C" {
+#include <libavutil/timestamp.h>
+}
+
 auto AVTsString(uint64_t ts) {
 	char buffer[AV_TS_MAX_STRING_SIZE] = { 0 };
 	av_ts_make_string(buffer, ts);
@@ -40,7 +44,7 @@ Stream::Stream(AVFormatContext* format_context, AVCodecID codec_id)
 	LOG_EXIT;
 }
 
-void Stream::SendFrame()
+void Stream::Encode()
 {
 	LOG_ENTER;
 	// note: frame can be null (e.g. on flush)
@@ -110,7 +114,7 @@ Stream::~Stream()
 	if (frame) {
 		av_frame_free(&frame);
 		// flush the encoder by sending an empty frame
-		SendFrame();
+		Encode();
 	}
 	if (context) {
 		avcodec_free_context(&context);

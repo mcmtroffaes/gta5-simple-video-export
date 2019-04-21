@@ -338,13 +338,13 @@ int main()
 	while (format->astream->Time() < 5.0) {
 		auto & astream = format->astream;
 		astream->NextFrame();
-		astream->SendFrame();
+		astream->Encode();
 		while (format->astream->Time() > format->vstream->Time()) {
 			auto & vstream = format->vstream;
 			auto t = vstream->frame->pts * av_q2d(vstream->context->time_base);
 			auto data = MakeVideoFrameData(width, height, pix_fmt, t);
 			vstream->MakeFrame(data.get());
-			vstream->SendFrame();
+			vstream->Encode();
 			vstream->frame->pts += 1;
 		}
 	}

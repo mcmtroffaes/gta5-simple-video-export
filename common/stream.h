@@ -4,9 +4,20 @@
 
 extern "C" {
 #include <libavformat/avformat.h>
-#include <libavutil/timestamp.h>
 }
 
+// A class for encoding frames to an AVStream.
+// Usage:
+// * Create a format context with avformat_alloc_output_context2.
+// * Create Stream objects (passing the created format context).
+// * Write the format header with avformat_write_header.
+// * For each frame you want to encode:
+//     - Copy your data to Stream::frame.
+//     - Call Stream::Encode() to encode this frame.
+// * Destroy the Stream objects (it is important to do this before writing the trailer, because this will flush the encoder).
+// * Write the format trailer with av_write_trailer.
+// * Destroy the format context.
+// It is important not to destroy the format context as long as the Stream object is in use.
 class Stream {
 public:
 	AVFormatContext* format_context; // context which owns this stream
@@ -20,7 +31,7 @@ public:
 	Stream(AVFormatContext* format_context, AVCodecID codec_id);
 
 	// send frame to the encoder
-	void SendFrame();
+	void Encode();
 
 	// current frame time (in seconds)
 	double Time() const;
