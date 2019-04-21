@@ -66,6 +66,7 @@ Settings::Settings()
 		logger->set_level(level);
 		logger->flush_on(flush_on);
 	}
+	AVLogSetLevel(level);
 	LOG_ENTER;
 	Section & secdef = sections[L"builtin"];
 	auto timestamp = TimeStamp();
