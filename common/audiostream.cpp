@@ -13,7 +13,7 @@ AVSampleFormat find_best_sample_fmt_of_list(const AVSampleFormat* sample_fmts, A
 }
 
 AudioStream::AudioStream(AVFormatContext* format_context, AVCodecID codec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-	: Stream{ format_context, codec_id }, sample_fmt{ sample_fmt }, swr{ nullptr }
+	: Stream{ format_context, codec_id }, sample_fmt{ sample_fmt }, swr{ nullptr }, fifo{ nullptr }
 {
 	LOG_ENTER;
 	if (context && context->codec_type != AVMEDIA_TYPE_AUDIO) {

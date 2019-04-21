@@ -78,7 +78,7 @@ auto MakeVideoData(size_t width, size_t height, AVPixelFormat pix_fmt, double t)
 	return data;
 };
 
-auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout, size_t nb_samples, uint64_t pts) {
+auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout, int nb_samples, uint64_t pts) {
 	LOG_ENTER;
 	const auto freq1 = 220.0;
 	const auto freq2 = 220.0 * 5.0 / 4.0; // perfect third
@@ -106,12 +106,12 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	case (AV_SAMPLE_FMT_FLT):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_flt++ = 0.3 * rawdata[j];
+				*q_flt++ = (float)(0.3 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_FLTP):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_flt++ = 0.3 * rawdata[j];
+				*q_flt++ = (float)(0.3 * rawdata[j]);
 		break;
 	default:
 		LOG->error("unsupported sample format");
