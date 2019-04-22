@@ -138,40 +138,37 @@ int main()
 	std::wstring base{ L"d:\\simple-video-export-test" };
 	auto exportsec = settings->GetSec(L"export");
 	settings->GetVar(exportsec, L"base", base);
-	std::wstring filename{ base + L".avi" };
+	std::wstring filename{ base + L".mkv" };
 	std::string ufilename{ wstring_to_utf8(filename) };
 	LOG->info("export started");
 	auto pix_fmt = AV_PIX_FMT_NV12;
 	auto width = 426;
 	auto height = 240;
 	auto sample_fmt = AV_SAMPLE_FMT_S16;
+	auto sample_rate = 10000;
 	std::unique_ptr<Format> format{ nullptr };
-	try {
-		format = std::unique_ptr<Format>(new Format(
-			ufilename,
-			AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
-			AV_CODEC_ID_AAC, sample_fmt, 44100, AV_CH_LAYOUT_STEREO));
-	}
-	catch (const std::exception & e) {
-		LOG->error(e.what());
-		exit(1);
-	}
+	format = std::unique_ptr<Format>(new Format(
+		ufilename,
+		AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
+		AV_CODEC_ID_AAC, sample_fmt, sample_rate, AV_CH_LAYOUT_STEREO));
 	int apts = 0;
 	while (format->astream->Time() < 5.0) {
 		while (format->vstream->Time() >= format->astream->Time()) {
+			const auto nb_samples = 1000;
 			auto adata = MakeAudioData(
-				sample_fmt, 44100, AV_CH_LAYOUT_STEREO,
-				10000, apts);
-			format->astream->Encode(adata.get(), 10000);
-			apts += 10000;
+				sample_fmt, sample_rate, AV_CH_LAYOUT_STEREO,
+				nb_samples, apts);
+			format->astream->Transcode(adata.get(), nb_samples);
+			apts += nb_samples;
 		}
 		while (format->astream->Time() >= format->vstream->Time()) {
 			auto vdata = MakeVideoData(
 				width, height, pix_fmt,
 				format->vstream->Time());
-			format->vstream->Encode(vdata.get());
+			format->vstream->Transcode(vdata.get());
 		}
 	}
+	format->Flush();
 	format = nullptr;
 	LOG->info("export finished");
 	LOG_EXIT;

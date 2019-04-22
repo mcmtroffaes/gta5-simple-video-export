@@ -33,6 +33,9 @@ public:
 	// send frame to the encoder
 	void Encode();
 
+	// flush encoder
+	virtual void Flush();
+
 	// current frame time (in seconds)
 	double Time() const;
 

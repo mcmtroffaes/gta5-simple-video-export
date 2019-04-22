@@ -52,7 +52,7 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 	LOG_EXIT;
 }
 
-void VideoStream::Encode(uint8_t* ptr)
+void VideoStream::Transcode(uint8_t* ptr)
 {
 	LOG_ENTER;
 	// fill frame with data given in ptr

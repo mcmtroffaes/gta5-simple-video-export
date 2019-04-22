@@ -27,8 +27,12 @@ public:
 	// set up stream with the given parameters
 	AudioStream(AVFormatContext* format_context, AVCodecID codec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout);
 
-	// encode the data (needs to match sample_fmt and channel_layout as specified in constructor)
-	void Encode(uint8_t *ptr, int nb_samples);
+	// transcode the data to a format that is compatible with the codec
+	// (needs to match sample_fmt and channel_layout as specified in constructor)
+	void Transcode(uint8_t *ptr, int nb_samples);
+
+	// flush the encoder
+	virtual void Flush();
 
 	~AudioStream();
 };

@@ -82,6 +82,13 @@ void Stream::Encode()
 	LOG_EXIT;
 }
 
+void Stream::Flush()
+{
+	// flush by sending empty frame to encoder
+	av_frame_free(&frame);
+	Encode();
+}
+
 double Stream::Time() const
 {
 	LOG_ENTER;
@@ -93,10 +100,6 @@ Stream::~Stream()
 {
 	LOG_ENTER;
 	av_frame_free(&frame);
-	// flush the encoder by sending an empty frame
-	// if a constructor raised an exception, codec may not be open
-	if (context && avcodec_is_open(context))
-		Encode();
 	avcodec_free_context(&context);
 	stream = nullptr;
 	LOG_EXIT;
