@@ -31,8 +31,5 @@ public:
 	// (needs to match sample_fmt and channel_layout as specified in constructor)
 	void Transcode(uint8_t *ptr, int nb_samples);
 
-	// flush the encoder
-	virtual void Flush();
-
 	~AudioStream();
 };

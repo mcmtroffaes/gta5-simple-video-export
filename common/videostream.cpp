@@ -55,6 +55,12 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 void VideoStream::Transcode(uint8_t* ptr)
 {
 	LOG_ENTER;
+	// we support passing a null ptr as a way of flushing the transcoder
+	if (!ptr) {
+		Stream::Flush();
+		LOG_EXIT;
+		return;
+	}
 	// fill frame with data given in ptr
 	// we use sws_scale to do this, this will also take care of any pixel format conversions
 	SwsContext* sws = sws_getContext(
@@ -76,8 +82,8 @@ void VideoStream::Transcode(uint8_t* ptr)
 		data, linesize, 0, frame->height,
 		frame->data, frame->linesize);
 	sws_freeContext(sws);
-	// now encode
-	Stream::Encode();
+	// now encode the frame
+	Encode();
 	// frame was sent, so update its presentation time stamp, for next encoding call
 	frame->pts += 1;
 	LOG_EXIT;

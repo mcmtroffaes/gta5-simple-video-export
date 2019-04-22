@@ -11,8 +11,11 @@ Format::Format(const std::string& filename, AVCodecID vcodec, int width, int hei
 	vstream.reset(new VideoStream(context, vcodec, width, height, frame_rate, pix_fmt));
 	astream.reset(new AudioStream(context, acodec, sample_fmt, sample_rate, channel_layout));
 	av_dump_format(context, 0, filename.c_str(), 1);
+	// none of the above functions should set context to null, but just in case...
+	if (!context)
+		LOG_THROW(std::runtime_error, fmt::format("output context lost"));
 	ret = avio_open(&context->pb, filename.c_str(), AVIO_FLAG_WRITE);
-	if (ret < 0)
+	if (ret < 0 || !context->pb)
 		LOG_THROW(std::runtime_error, fmt::format("failed to open '{}' for writing: {}", filename, AVErrorString(ret)));
 	if (!(context->oformat->flags & AVFMT_NOFILE)) {
 		ret = avformat_write_header(context, NULL);
@@ -25,9 +28,9 @@ Format::Format(const std::string& filename, AVCodecID vcodec, int width, int hei
 void Format::Flush()
 {
 	if (vstream)
-		vstream->Flush();
+		vstream->Transcode(nullptr);
 	if (astream)
-		astream->Flush();
+		astream->Transcode(nullptr, 0);
 	int ret = av_write_trailer(context);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to write trailer: {}", AVErrorString(ret)));
