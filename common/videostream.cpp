@@ -11,7 +11,7 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 {
 	LOG_ENTER;
 	if (context->codec->type != AVMEDIA_TYPE_VIDEO)
-		throw std::invalid_argument(fmt::format("selected video codec {} does not support video", context->codec->name));
+		LOG_THROW(std::invalid_argument, fmt::format("selected video codec {} does not support video", context->codec->name));
 	context->width = width;
 	context->height = height;
 	context->time_base = av_inv_q(frame_rate);
@@ -37,7 +37,7 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 	}
 	int ret = avcodec_open2(context, NULL, NULL);
 	if (ret < 0)
-		throw std::runtime_error(fmt::format("failed to open video codec: {}", AVErrorString(ret)));
+		LOG_THROW(std::runtime_error, fmt::format("failed to open video codec: {}", AVErrorString(ret)));
 	avcodec_parameters_from_context(stream->codecpar, context);
 	// note: this is only a hint, actual stream time_base can be different
 	// avformat_write_header will set the final stream time_base
@@ -48,7 +48,7 @@ VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, in
 	frame->format = context->pix_fmt;
 	ret = av_frame_get_buffer(frame, 0);
 	if (ret < 0)
-		throw std::runtime_error(fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
 	LOG_EXIT;
 }
 
@@ -62,15 +62,15 @@ void VideoStream::Transcode(uint8_t* ptr)
 		frame->width, frame->height, context->pix_fmt,
 		SWS_BICUBIC, nullptr, nullptr, nullptr);
 	if (!sws)
-		throw std::runtime_error("failed to initialize pixel conversion context");
+		LOG_THROW(std::runtime_error, "failed to initialize pixel conversion context");
 	uint8_t* data[4];
 	int linesize[4];
 	int ret = av_image_fill_linesizes(linesize, pix_fmt, frame->width);
 	if (ret < 0)
-		throw std::runtime_error("failed to get image line sizes");
+		LOG_THROW(std::runtime_error, "failed to get image line sizes");
 	ret = av_image_fill_pointers(data, pix_fmt, frame->height, ptr, linesize);
 	if (ret < 0)
-		throw std::runtime_error("failed to get image pointers");
+		LOG_THROW(std::runtime_error, "failed to get image pointers");
 	sws_scale(
 		sws,
 		data, linesize, 0, frame->height,

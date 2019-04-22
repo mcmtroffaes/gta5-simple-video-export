@@ -26,3 +26,4 @@ std::string AVErrorString(int errnum);
 #define LOG if (logger) logger
 #define LOG_ENTER LOG->trace("{}: enter", __func__)
 #define LOG_EXIT LOG->trace("{}: exit", __func__)
+#define LOG_THROW(EXC, MSG) { LOG->critical(MSG); throw EXC(MSG); }

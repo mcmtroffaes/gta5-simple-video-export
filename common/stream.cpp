@@ -21,19 +21,19 @@ Stream::Stream(AVFormatContext* format_context, AVCodecID codec_id)
 {
 	LOG_ENTER;
 	if (!format_context)
-		throw std::invalid_argument("format context cannot be null");
+		LOG_THROW(std::invalid_argument, "format context cannot be null");
 	const AVCodec* codec = avcodec_find_encoder(codec_id);
 	if (!codec)
-		throw std::invalid_argument(fmt::format("failed to find encoder with codec id {}", codec_id));
+		LOG_THROW(std::invalid_argument, fmt::format("failed to find encoder with codec id {}", codec_id));
 	stream = avformat_new_stream(format_context, codec);
 	if (!stream)
-		throw std::runtime_error(fmt::format("failed to allocate stream for codec {}", codec->name));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate stream for codec {}", codec->name));
 	context = avcodec_alloc_context3(codec);
 	if (!context)
-		throw std::runtime_error(fmt::format("failed to allocate context for codec {}", codec->name));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate context for codec {}", codec->name));
 	frame = av_frame_alloc();
 	if (!frame)
-		throw std::runtime_error(fmt::format("failed to allocate frame"));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame"));
 	frame->pts = 0;
 	LOG_EXIT;
 }
