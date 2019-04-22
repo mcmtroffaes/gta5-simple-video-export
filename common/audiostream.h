@@ -11,8 +11,11 @@ class AudioStream :
 	public Stream
 {
 private:
-	// native sample format as passed to the constructor (this can be different from context->sample_fmt)
+	// parameters as passed to constructor (which can be different from encoder context)
 	const AVSampleFormat sample_fmt;
+	const int sample_rate;
+	const uint64_t channel_layout;
+	const int channels;
 
 	// resampler context
 	SwrContext* swr;

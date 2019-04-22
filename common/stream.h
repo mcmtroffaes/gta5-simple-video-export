@@ -23,7 +23,7 @@ public:
 	AVFormatContext* format_context; // context which owns this stream
 	AVStream* stream;                // the stream
 	AVCodecContext* context;         // codec context for this stream
-	AVFrame* frame;                  // pre-allocated frame for storage during encoding
+	AVFrame* frame;                  // the frame to be encoded
 
 	// add stream to the given format context, and initialize codec context and frame
 	// note: frame buffer is not allocated (we do not know the stream format yet at this point)
