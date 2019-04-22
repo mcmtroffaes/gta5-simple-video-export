@@ -172,9 +172,13 @@ void AudioStream::Transcode(uint8_t* ptr, int nb_samples)
 		int nb_read = av_audio_fifo_read(fifo, (void**)frame->data, frame->nb_samples);
 		if (nb_read < 0)
 			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
+		frame->nb_samples = nb_read;
 		Encode();
 		frame->pts += nb_read;
 		Stream::Flush();
+		int nb_lost = av_audio_fifo_size(fifo);
+		if (nb_lost)
+			LOG->warn("audio buffer not completely flushed, {} samples lost");
 	}
 	LOG_EXIT;
 }
