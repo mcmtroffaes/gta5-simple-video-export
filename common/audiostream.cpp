@@ -118,21 +118,44 @@ AudioStream::AudioStream(AVFormatContext* format_context, AVCodecID codec_id, AV
 	LOG_EXIT;
 }
 
-void AudioStream::Encode(uint8_t* ptr)
+void AudioStream::Encode(uint8_t* ptr, int nb_samples)
 {
 	LOG_ENTER;
-	uint8_t* data[4];
-	int linesize[4];
-	av_samples_fill_arrays(data, linesize, ptr, context->channels, frame->nb_samples, sample_fmt, 1);
-	int ret = swr_convert(swr, frame->data, frame->nb_samples, (const uint8_t **)data, frame->nb_samples);
-	if (ret < 0) {
-		LOG->error("resampling error: {}", AVErrorString(ret));
+	// convert source pointer to standard data/linesize format
+	uint8_t* src_data[4];
+	int src_linesize[4];
+	int ret = av_samples_fill_arrays(src_data, src_linesize, ptr, channels, nb_samples, sample_fmt, 1);
+	if (ret < 0)
+		throw std::runtime_error(fmt::format("failed to fill audio sample arrays: {}", AVErrorString(ret)));
+	// number of samples required in the destination buffer (to avoid buffering)
+	int dst_nb_samples = swr_get_out_samples(swr, nb_samples);
+	if (dst_nb_samples < 0)
+		LOG->warn("failed to get samples from audio resampler: {}", AVErrorString(dst_nb_samples));
+	// allocate destination buffer
+	uint8_t* dst_data[4];
+	int dst_linesize[4];
+	ret = av_samples_alloc(dst_data, dst_linesize, frame->channels, dst_nb_samples, context->sample_fmt, 0);
+	if (ret < 0)
+		throw std::runtime_error(fmt::format("failed to allocate audio destination buffer: {}", AVErrorString(ret)));
+	// resample source data to destination buffer
+	ret = swr_convert(swr, dst_data, dst_nb_samples, (const uint8_t **)src_data, nb_samples);
+	if (ret < 0)
+		throw std::runtime_error(fmt::format("resampling error: {}", AVErrorString(ret)));
+	if (ret != dst_nb_samples)
+		LOG->warn("destination buffer had size {} but required size {}", dst_nb_samples, ret); // turn into debug later
+	av_audio_fifo_write(fifo, (void**) dst_data, ret);
+	// free destination buffer
+	av_freep(&dst_data[0]);
+	// read from fifo buffer in chunks of frame->nb_samples, until no further chunks can be read
+	while (av_audio_fifo_size(fifo) >= frame->nb_samples) {
+		ret = av_audio_fifo_read(fifo, (void**)frame->data, frame->nb_samples);
+		if (ret < 0)
+			throw std::runtime_error(fmt::format("audio buffer read error: {}", AVErrorString(ret)));
+		if (ret != frame->nb_samples)
+			LOG->warn("expected {} samples from audio buffer but got {}", frame->nb_samples, ret); // turn into debug later
+		Stream::Encode();
+		frame->pts += frame->nb_samples;
 	}
-	else if (frame->nb_samples != ret) {
-		LOG->error("expected {} samples but got {}", frame->nb_samples, ret);
-	};
-	Stream::Encode();
-	frame->pts += frame->nb_samples;
 	LOG_EXIT;
 }
 
@@ -140,9 +163,28 @@ AudioStream::~AudioStream()
 {
 	LOG_ENTER;
 	if (fifo) {
+		// flush audio buffer
+		if (av_audio_fifo_size(fifo)) {
+			int ret = av_audio_fifo_read(fifo, (void**)frame->data, frame->nb_samples);
+			// do not throw on error (we're in the destructor)
+			if (ret < 0)
+				LOG->error("audio buffer read error: {}", AVErrorString(ret));
+			else {
+				if (ret >= frame->nb_samples)
+					LOG->warn("expected fewer than {} samples from audio buffer but got {}", frame->nb_samples, ret); // turn into debug later
+				Stream::Encode();
+				frame->pts += ret;
+			}
+		}
+		// free the buffer
 		av_audio_fifo_free(fifo);
 	}
 	if (swr) {
+		auto dst_nb_samples = swr_get_out_samples(swr, 0);
+		if (dst_nb_samples < 0)
+			LOG->warn("failed to get samples from resampler: {}", AVErrorString(dst_nb_samples));
+		if (dst_nb_samples > 0)
+			LOG->warn("audio resampling buffer was not empty: {} samples lost", dst_nb_samples);
 		swr_free(&swr);
 	}
 	LOG_EXIT;

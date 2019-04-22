@@ -76,8 +76,9 @@ void VideoStream::Encode(uint8_t* ptr)
 		data, linesize, 0, frame->height,
 		frame->data, frame->linesize);
 	sws_freeContext(sws);
-	// now encode, and update the frame presentation time stamp
+	// now encode
 	Stream::Encode();
+	// frame was sent, so update its presentation time stamp, for next encoding call
 	frame->pts += 1;
 	LOG_EXIT;
 }

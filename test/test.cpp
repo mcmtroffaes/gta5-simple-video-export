@@ -82,13 +82,14 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	LOG_ENTER;
 	const auto freq1 = 220.0;
 	const auto freq2 = 220.0 * 5.0 / 4.0; // perfect third
+	const auto freq3 = 1.0;
 	const auto delta = 0.5;
 	const auto channels = av_get_channel_layout_nb_channels(channel_layout);
 	auto data{ std::make_unique<uint8_t[]>(av_samples_get_buffer_size(NULL, channels, nb_samples, sample_fmt, 1)) };
 	auto rawdata{ std::make_unique<double[]>(nb_samples) };
 	for (int j = 0; j < nb_samples; j++) {
 		auto two_pi_time = (2.0 * M_PI * (pts + j)) / sample_rate;
-		rawdata[j] = sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time));
+		rawdata[j] = sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time) * sin(freq3 * two_pi_time));
 	}
 	int16_t* q_s16 = (int16_t*)data.get();
 	float* q_flt = (float*)data.get();
@@ -137,7 +138,7 @@ int main()
 	std::wstring base{ L"d:\\simple-video-export-test" };
 	auto exportsec = settings->GetSec(L"export");
 	settings->GetVar(exportsec, L"base", base);
-	std::wstring filename{ base + L".mkv" };
+	std::wstring filename{ base + L".avi" };
 	std::string ufilename{ wstring_to_utf8(filename) };
 	LOG->info("export started");
 	auto pix_fmt = AV_PIX_FMT_NV12;
@@ -155,12 +156,14 @@ int main()
 		LOG->error(e.what());
 		exit(1);
 	}
+	int apts = 0;
 	while (format->astream->Time() < 5.0) {
 		while (format->vstream->Time() >= format->astream->Time()) {
 			auto adata = MakeAudioData(
 				sample_fmt, 44100, AV_CH_LAYOUT_STEREO,
-				format->astream->frame->nb_samples, format->astream->frame->pts);
-			format->astream->Encode(adata.get());
+				10000, apts);
+			format->astream->Encode(adata.get(), 10000);
+			apts += 10000;
 		}
 		while (format->astream->Time() >= format->vstream->Time()) {
 			auto vdata = MakeVideoData(
