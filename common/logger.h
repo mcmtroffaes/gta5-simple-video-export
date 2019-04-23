@@ -12,7 +12,7 @@
 extern std::shared_ptr<spdlog::logger> logger;
 
 // parse spdlog::level
-std::wistream & operator >> (std::wistream & is, spdlog::level::level_enum & value);
+std::istream & operator >> (std::istream & is, spdlog::level::level_enum & value);
 
 // set av_log level
 // call this whenever you change the logger level

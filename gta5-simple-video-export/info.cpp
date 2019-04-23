@@ -6,7 +6,7 @@
 std::wstring GUIDToString(const GUID & guid) {
 	LOG_ENTER;
 	wchar_t buffer[48];
-	_snwprintf_s(buffer, sizeof(buffer), L"%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
+	_snprintf_s(buffer, sizeof(buffer), "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
 		guid.Data1, guid.Data2, guid.Data3,
 		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
 		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
@@ -26,7 +26,7 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	LOG->debug("audio stream index = {}", stream_index_);
 	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype_);
 	if (SUCCEEDED(hr)) {
-		LOG->info(L"audio subtype = {}", GUIDToString(subtype_));
+		LOG->info("audio subtype = {}", GUIDToString(subtype_));
 		hr = input_media_type.GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &rate_);
 	}
 	if (SUCCEEDED(hr)) {
@@ -45,20 +45,20 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
 
 void AudioInfo::UpdateSettings(Settings & settings) const {
 	LOG_ENTER;
-	auto & defsec = settings.sections[L"builtin"];
-	defsec[L"audio_rate"] = std::to_wstring(rate_);
-	defsec[L"audio_num_channels"] = std::to_wstring(num_channels_);
-	defsec[L"audio_bits_per_sample"] = std::to_wstring(bits_per_sample_);
-	const auto & audioformats = settings.GetSec(L"audioformats");
+	auto & defsec = settings.sections["builtin"];
+	defsec["audio_rate"] = std::to_wstring(rate_);
+	defsec["audio_num_channels"] = std::to_wstring(num_channels_);
+	defsec["audio_bits_per_sample"] = std::to_wstring(bits_per_sample_);
+	const auto & audioformats = settings.GetSec("audioformats");
 	auto subtype_str = GUIDToString(subtype_);
 	auto format = audioformats.find(subtype_str);
 	if (format != audioformats.end()) {
-		defsec[L"audio_format"] = format->second;
-		LOG->info(L"audio format = {}", format->second);
+		defsec["audio_format"] = format->second;
+		LOG->info("audio format = {}", format->second);
 	}
 	else {
-		LOG->error(L"audio subtype = {} = unsupported", subtype_str);
-		LOG->error(L"please add an audioformats entry for {} in {}", subtype_str, settings.ini_filename_);
+		LOG->error("audio subtype = {} = unsupported", subtype_str);
+		LOG->error("please add an audioformats entry for {} in {}", subtype_str, settings.ini_filename_);
 	}
 	LOG_EXIT;
 }
@@ -76,7 +76,7 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	LOG->debug("video stream index = {}", stream_index_);
 	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype_);
 	if (SUCCEEDED(hr)) {
-		LOG->info(L"video subtype = {}", GUIDToString(subtype_));
+		LOG->info("video subtype = {}", GUIDToString(subtype_));
 		hr = MFGetAttributeSize(&input_media_type, MF_MT_FRAME_SIZE, &width_, &height_);
 	}
 	if (SUCCEEDED(hr)) {
@@ -91,21 +91,21 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 
 void VideoInfo::UpdateSettings(Settings & settings) const {
 	LOG_ENTER;
-	auto & defsec = settings.sections[L"builtin"];
-	defsec[L"width"] = std::to_wstring(width_);
-	defsec[L"height"] = std::to_wstring(height_);
-	defsec[L"framerate_numerator"] = std::to_wstring(framerate_numerator_);
-	defsec[L"framerate_denominator"] = std::to_wstring(framerate_denominator_);
-	const auto & videoformats = settings.GetSec(L"videoformats");
+	auto & defsec = settings.sections["builtin"];
+	defsec["width"] = std::to_wstring(width_);
+	defsec["height"] = std::to_wstring(height_);
+	defsec["framerate_numerator"] = std::to_wstring(framerate_numerator_);
+	defsec["framerate_denominator"] = std::to_wstring(framerate_denominator_);
+	const auto & videoformats = settings.GetSec("videoformats");
 	auto subtype_str = GUIDToString(subtype_);
 	auto format = videoformats.find(subtype_str);
 	if (format != videoformats.end()) {
-		defsec[L"video_format"] = format->second;
-		LOG->info(L"video format = {}", format->second);
+		defsec["video_format"] = format->second;
+		LOG->info("video format = {}", format->second);
 	}
 	else {
-		LOG->error(L"video subtype = {} = unsupported", subtype_str);
-		LOG->error(L"please add a videoformats entry for {} in {}", subtype_str, settings.ini_filename_);
+		LOG->error("video subtype = {} = unsupported", subtype_str);
+		LOG->error("please add a videoformats entry for {} in {}", subtype_str, settings.ini_filename_);
 	}
 	LOG_EXIT;
 }
@@ -114,15 +114,15 @@ void CreateBatchFile(const Settings & settings)
 {
 	LOG_ENTER;
 	std::wstring batch_filename;
-	auto sec = settings.GetSec(L"raw");
-	if (settings.GetVar(sec, L"batch_filename", batch_filename)) {
+	auto sec = settings.GetSec("raw");
+	if (settings.GetVar(sec, "batch_filename", batch_filename)) {
 		std::wstring batch_command;
-		if (settings.GetVar(sec, L"batch_command", batch_command)) {
-			LOG->info(L"creating {}; run this file to process the raw output", batch_filename);
+		if (settings.GetVar(sec, "batch_command", batch_command)) {
+			LOG->info("creating {}; run this file to process the raw output", batch_filename);
 			std::wofstream os(batch_filename, std::ios::out | std::ios::trunc);
-			os << L"@echo off" << std::endl;
+			os << "@echo off" << std::endl;
 			os << batch_command << std::endl;
-			os << L"pause" << std::endl;
+			os << "pause" << std::endl;
 			os.close();
 		}
 		else {

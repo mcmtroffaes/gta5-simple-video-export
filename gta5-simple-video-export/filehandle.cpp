@@ -1,12 +1,18 @@
 #include "filehandle.h"
 #include "logger.h"
 
+std::wstring wstring_from_utf8(const std::string& str)
+{
+	std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
+	return myconv.from_bytes(str);
+}
+
 FileHandle::FileHandle() : handle_(INVALID_HANDLE_VALUE), path_() {};
 
-FileHandle::FileHandle(const std::wstring & path) : FileHandle() {
+FileHandle::FileHandle(const std::string & path) : FileHandle() {
 	LOG_ENTER;
-	path_ = path;
-	LOG->info(L"opening file {} for writing", path_);
+	LOG->info("opening file {} for writing", path);
+	path_ = wstring_from_utf8(path);
 	handle_ = CreateFileW(path_.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!IsValid()) {
 		LOG->error("failed to create file");
@@ -17,7 +23,7 @@ FileHandle::FileHandle(const std::wstring & path) : FileHandle() {
 FileHandle::~FileHandle() {
 	LOG_ENTER;
 	if (IsValid()) {
-		LOG->info(L"closing {}", path_);
+		LOG->info("closing {}", path_);
 		CloseHandle(handle_);
 	}
 	LOG_EXIT;

@@ -6,29 +6,29 @@ extern "C" {
 #include <libavutil/log.h>
 }
 
-std::wistream & operator >> (std::wistream & is, spdlog::level::level_enum & value)
+std::istream & operator >> (std::istream & is, spdlog::level::level_enum & value)
 {
-	std::wstring value_str;
+	std::string value_str;
 	is >> value_str;
-	if (value_str == L"trace") {
+	if (value_str == "trace") {
 		value = spdlog::level::trace;
 	}
-	else if (value_str == L"debug") {
+	else if (value_str == "debug") {
 		value = spdlog::level::debug;
 	}
-	else if (value_str == L"info") {
+	else if (value_str == "info") {
 		value = spdlog::level::info;
 	}
-	else if (value_str == L"warn") {
+	else if (value_str == "warn") {
 		value = spdlog::level::warn;
 	}
-	else if (value_str == L"err") {
+	else if (value_str == "err") {
 		value = spdlog::level::err;
 	}
-	else if (value_str == L"critical") {
+	else if (value_str == "critical") {
 		value = spdlog::level::critical;
 	}
-	else if (value_str == L"off") {
+	else if (value_str == "off") {
 		value = spdlog::level::off;
 	}
 	else {

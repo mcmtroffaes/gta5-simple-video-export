@@ -125,17 +125,17 @@ STDAPI SinkWriterBeginWriting(
 		video_info->UpdateSettings(*settings);
 		std::wostringstream os;
 		settings->generate(os);
-		LOG->debug(L"settings before interpolation:\n{}", os.str());
-		settings->default_section(settings->sections[L"builtin"]);
+		LOG->debug("settings before interpolation:\n{}", os.str());
+		settings->default_section(settings->sections["builtin"]);
 		settings->interpolate();
-		os.str(L"");
+		os.str("");
 		settings->generate(os);
-		LOG->debug(L"settings after interpolation:\n{}", os.str());
-		auto rawsec = settings->GetSec(L"raw");
-		std::wstring audio_filename{ };
-		std::wstring video_filename{ };
-		settings->GetVar(rawsec, L"audio_filename", audio_filename);
-		settings->GetVar(rawsec, L"video_filename", video_filename);
+		LOG->debug("settings after interpolation:\n{}", os.str());
+		auto rawsec = settings->GetSec("raw");
+		std::string audio_filename{ };
+		std::string video_filename{ };
+		settings->GetVar(rawsec, "audio_filename", audio_filename);
+		settings->GetVar(rawsec, "video_filename", video_filename);
 		audio_info->handle_.reset(new FileHandle(audio_filename));
 		video_info->handle_.reset(new FileHandle(video_filename));
 		CreateBatchFile(*settings);
@@ -242,8 +242,8 @@ STDAPI CreateSinkWriterFromURL(
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
 	auto enable = true;
-	auto defsec = settings->GetSec(L"builtin");
-	settings->GetVar(defsec, L"enable", enable);
+	auto defsec = settings->GetSec("builtin");
+	settings->GetVar(defsec, "enable", enable);
 	if (!enable) {
 		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();

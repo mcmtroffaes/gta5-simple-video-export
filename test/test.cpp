@@ -18,18 +18,6 @@ extern "C" {
 std::shared_ptr<spdlog::logger> logger = nullptr;
 std::unique_ptr<Settings> settings = nullptr;
 
-std::string wstring_to_utf8(const std::wstring& str)
-{
-	std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
-	return myconv.to_bytes(str);
-}
-
-std::wstring wstring_from_utf8(const std::string& str)
-{
-	std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
-	return myconv.from_bytes(str);
-}
-
 auto MakeVideoData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
 	LOG_ENTER;
 	std::unique_ptr<uint8_t[]> data{ nullptr };
@@ -128,27 +116,26 @@ int main()
 	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
 	settings.reset(new Settings);
 	LOG_ENTER;
-	std::wostringstream os;
+	std::ostringstream os;
 	settings->generate(os);
-	LOG->trace(L"settings before interpolation:\n{}", os.str());
+	LOG->trace("settings before interpolation:\n{}", os.str());
 	settings->interpolate();
-	os.str(L"");
+	os.str("");
 	settings->generate(os);
-	LOG->trace(L"settings after interpolation:\n{}", os.str());
-	std::wstring base{ L"d:\\simple-video-export-test" };
-	auto exportsec = settings->GetSec(L"export");
-	settings->GetVar(exportsec, L"base", base);
-	std::wstring filename{ base + L".mkv" };
-	std::string ufilename{ wstring_to_utf8(filename) };
+	LOG->trace("settings after interpolation:\n{}", os.str());
+	std::string base{ "simple-video-export-test-video" };
+	auto exportsec = settings->GetSec("export");
+	settings->GetVar(exportsec, "base", base);
+	std::string filename{ base + ".mkv" };
 	LOG->info("export started");
 	auto pix_fmt = AV_PIX_FMT_NV12;
-	auto width = 426;
-	auto height = 240;
+	auto width = 416;
+	auto height = 234;
 	auto sample_fmt = AV_SAMPLE_FMT_S16;
 	auto sample_rate = 10000;
 	std::unique_ptr<Format> format{ nullptr };
 	format = std::unique_ptr<Format>(new Format(
-		ufilename,
+		filename,
 		AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
 		AV_CODEC_ID_AAC, sample_fmt, sample_rate, AV_CH_LAYOUT_STEREO));
 	int apts = 0;

@@ -5,27 +5,27 @@
 
 #define SCRIPT_NAME "SimpleVideoExport"
 
-class Settings : public inipp::Ini<wchar_t>
+class Settings : public inipp::Ini<char>
 {
 public:
-	static const std::wstring ini_filename_;
+	static const std::string ini_filename_;
 	Settings();
 
-	const Section & GetSec(const std::wstring & sec_name) const;
+	const Section & GetSec(const std::string & sec_name) const;
 
 	template <typename T>
-	bool GetVar(const Section & sec, const std::wstring & var_name, T & value) const
+	bool GetVar(const Section & sec, const std::string & var_name, T & value) const
 	{
 		LOG_ENTER;
 		bool found = false;
 		auto var = sec.find(var_name);
 		if (var == sec.end()) {
-			LOG->warn(L"variable {} not found", var_name);
+			LOG->warn("variable {} not found", var_name);
 		}
 		else {
 			found = inipp::extract(var->second, value);
 			if (!found) {
-				LOG->error(L"failed to parse {}", var->second);
+				LOG->error("failed to parse {}", var->second);
 			}
 		}
 		return found;
