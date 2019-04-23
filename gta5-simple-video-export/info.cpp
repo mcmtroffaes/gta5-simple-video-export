@@ -46,9 +46,9 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
 void AudioInfo::UpdateSettings(Settings & settings) const {
 	LOG_ENTER;
 	auto & defsec = settings.sections["builtin"];
-	defsec["audio_rate"] = std::to_wstring(rate_);
-	defsec["audio_num_channels"] = std::to_wstring(num_channels_);
-	defsec["audio_bits_per_sample"] = std::to_wstring(bits_per_sample_);
+	defsec["audio_rate"] = std::to_string(rate_);
+	defsec["audio_num_channels"] = std::to_string(num_channels_);
+	defsec["audio_bits_per_sample"] = std::to_string(bits_per_sample_);
 	const auto & audioformats = settings.GetSec("audioformats");
 	auto subtype_str = GUIDToString(subtype_);
 	auto format = audioformats.find(subtype_str);
@@ -92,10 +92,10 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 void VideoInfo::UpdateSettings(Settings & settings) const {
 	LOG_ENTER;
 	auto & defsec = settings.sections["builtin"];
-	defsec["width"] = std::to_wstring(width_);
-	defsec["height"] = std::to_wstring(height_);
-	defsec["framerate_numerator"] = std::to_wstring(framerate_numerator_);
-	defsec["framerate_denominator"] = std::to_wstring(framerate_denominator_);
+	defsec["width"] = std::to_string(width_);
+	defsec["height"] = std::to_string(height_);
+	defsec["framerate_numerator"] = std::to_string(framerate_numerator_);
+	defsec["framerate_denominator"] = std::to_string(framerate_denominator_);
 	const auto & videoformats = settings.GetSec("videoformats");
 	auto subtype_str = GUIDToString(subtype_);
 	auto format = videoformats.find(subtype_str);
