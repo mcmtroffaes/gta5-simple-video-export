@@ -113,7 +113,7 @@ void VideoInfo::UpdateSettings(Settings & settings) const {
 void CreateBatchFile(const Settings & settings)
 {
 	LOG_ENTER;
-	std::wstring batch_filename;
+	std::string batch_filename;
 	auto sec = settings.GetSec("raw");
 	if (settings.GetVar(sec, "batch_filename", batch_filename)) {
 		std::string batch_command;
