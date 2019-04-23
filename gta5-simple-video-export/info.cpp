@@ -116,10 +116,11 @@ void CreateBatchFile(const Settings & settings)
 	std::wstring batch_filename;
 	auto sec = settings.GetSec("raw");
 	if (settings.GetVar(sec, "batch_filename", batch_filename)) {
-		std::wstring batch_command;
+		std::string batch_command;
 		if (settings.GetVar(sec, "batch_command", batch_command)) {
 			LOG->info("creating {}; run this file to process the raw output", batch_filename);
-			std::wofstream os(batch_filename, std::ios::out | std::ios::trunc);
+			// TODO turn batch_filename into a UTF16 encoded wstring
+			std::ofstream os(batch_filename, std::ios::out | std::ios::trunc);
 			os << "@echo off" << std::endl;
 			os << batch_command << std::endl;
 			os << "pause" << std::endl;
