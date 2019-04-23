@@ -18,20 +18,25 @@ extern "C" {
 std::shared_ptr<spdlog::logger> logger = nullptr;
 std::unique_ptr<Settings> settings = nullptr;
 
+#define DATAY(S, X, Y, T) (uint8_t)(S * (X + Y) + T * 30)
+#define DATAU(S, X, Y, T) (uint8_t)(128 + S * Y + T * 20)
+#define DATAV(S, X, Y, T) (uint8_t)(64 + S * X + T * 50)
+
 auto MakeVideoData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
 	LOG_ENTER;
 	std::unique_ptr<uint8_t[]> data{ nullptr };
 	size_t i{ 0 };
+	double s{ 416.0 / width };
 	switch (pix_fmt) {
 	case AV_PIX_FMT_NV12:
 		data = std::make_unique<uint8_t[]>(width * height + 2 * ((width / 2) * (height / 2)));
 		for (int y = 0; y < height; y++)
 			for (int x = 0; x < width; x++)
-				data[i++] = (uint8_t)(x + y + t * 30);
+				data[i++] = DATAY(s, x, y, t);
 		for (int y = 0; y < height / 2; y++) {
 			for (int x = 0; x < width / 2; x++) {
-				data[i++] = (uint8_t)(128 + y + t * 20);
-				data[i++] = (uint8_t)(64 + x + t * 50);
+				data[i++] = DATAU(s, x, y, t);
+				data[i++] = DATAV(s, x, y, t);
 			}
 		}
 		break;
@@ -39,25 +44,25 @@ auto MakeVideoData(size_t width, size_t height, AVPixelFormat pix_fmt, double t)
 		data = std::make_unique<uint8_t[]>(width * height + 2 * ((width / 2) * (height / 2)));
 		for (int y = 0; y < height; y++)
 			for (int x = 0; x < width; x++)
-				data[i++] = (uint8_t)(x + y + t * 30);
+				data[i++] = DATAY(s, x, y, t);
 		for (int y = 0; y < height / 2; y++)
 			for (int x = 0; x < width / 2; x++)
-				data[i++] = (uint8_t)(128 + y + t * 20);
+				data[i++] = DATAU(s, x, y, t);
 		for (int y = 0; y < height / 2; y++)
 			for (int x = 0; x < width / 2; x++)
-				data[i++] = (uint8_t)(64 + x + t * 50);
+				data[i++] = DATAV(s, x, y, t);
 		break;
 	case AV_PIX_FMT_YUV444P:
 		data = std::make_unique<uint8_t[]>(3 * width * height);
 		for (int y = 0; y < height; y++)
 			for (int x = 0; x < width; x++)
-				data[i++] = (uint8_t)(x + y + t * 30);
+				data[i++] = DATAY(s, x, y, t);
 		for (int y = 0; y < height; y++)
 			for (int x = 0; x < width; x++)
-				data[i++] = (uint8_t)(128 + 0.5 * y + t * 20);
+				data[i++] = DATAU(s, 0.5 * x, 0.5 * y, t);
 		for (int y = 0; y < height; y++)
 			for (int x = 0; x < width; x++)
-				data[i++] = (uint8_t)(64 + 0.5 * x + t * 50);
+				data[i++] = DATAV(s, 0.5 * x, 0.5 * y, t);
 		break;
 	default:
 		LOG->error("unsupported pixel format");
@@ -110,40 +115,25 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	return data;
 }
 
-int main()
+void Test(
+	const std::string& filename,
+	AVCodecID vcodec_id, AVRational frame_rate, AVPixelFormat pix_fmt,
+	AVCodecID acodec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 {
-	AVLogSetCallback();
-	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
-	settings.reset(new Settings);
-	LOG_ENTER;
-	std::ostringstream os;
-	settings->generate(os);
-	LOG->trace("settings before interpolation:\n{}", os.str());
-	settings->interpolate();
-	os.str("");
-	settings->generate(os);
-	LOG->trace("settings after interpolation:\n{}", os.str());
-	std::string base{ "simple-video-export-test-video" };
-	auto exportsec = settings->GetSec("export");
-	settings->GetVar(exportsec, "base", base);
-	std::string filename{ base + ".mkv" };
 	LOG->info("export started");
-	auto pix_fmt = AV_PIX_FMT_NV12;
 	auto width = 416;
 	auto height = 234;
-	auto sample_fmt = AV_SAMPLE_FMT_S16;
-	auto sample_rate = 10000;
 	std::unique_ptr<Format> format{ nullptr };
-	format = std::unique_ptr<Format>(new Format(
+	format.reset(new Format(
 		filename,
-		AV_CODEC_ID_FFV1, width, height, AVRational{ 30000, 1001 }, pix_fmt,
-		AV_CODEC_ID_AAC, sample_fmt, sample_rate, AV_CH_LAYOUT_STEREO));
+		vcodec_id, width, height, frame_rate, pix_fmt,
+		acodec_id, sample_fmt, sample_rate, channel_layout));
 	int apts = 0;
 	while (format->astream->Time() < 5.0) {
 		while (format->vstream->Time() >= format->astream->Time()) {
 			const auto nb_samples = 1000;
 			auto adata = MakeAudioData(
-				sample_fmt, sample_rate, AV_CH_LAYOUT_STEREO,
+				sample_fmt, sample_rate, channel_layout,
 				nb_samples, apts);
 			format->astream->Transcode(adata.get(), nb_samples);
 			apts += nb_samples;
@@ -158,5 +148,34 @@ int main()
 	format->Flush();
 	format = nullptr;
 	LOG->info("export finished");
+	LOG_EXIT;
+}
+
+int main()
+{
+	AVLogSetCallback();
+	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
+	LOG_ENTER;
+	Test(
+		"test-ffv1-nv12-flac-s16.mkv",
+		AV_CODEC_ID_FFV1, AVRational{ 30000, 1001 }, AV_PIX_FMT_NV12,
+		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 10000, AV_CH_LAYOUT_STEREO);
+	Test(
+		"test-ffv1-yuv420-flac-flt.mkv",
+		AV_CODEC_ID_FFV1, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
+		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 10000, AV_CH_LAYOUT_STEREO);
+	Test(
+		"test-mpeg4-yuv420-aac-flt.mp4",
+		AV_CODEC_ID_MPEG4, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
+		AV_CODEC_ID_AAC, AV_SAMPLE_FMT_FLT, 10000, AV_CH_LAYOUT_STEREO);
+	try {
+		Test(
+			"test-unsupported-codec-in-container.mp4",
+			AV_CODEC_ID_MPEG4, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
+			AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 10000, AV_CH_LAYOUT_STEREO);
+	}
+	catch (std::exception& e) {
+		assert(std::string(e.what()).find("failed to write header") == 0);
+	}
 	LOG_EXIT;
 }
