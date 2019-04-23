@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-std::wstring GUIDToString(const GUID & guid) {
+auto GUIDToString(const GUID & guid) {
 	LOG_ENTER;
 	char buffer[48];
 	_snprintf_s(buffer, sizeof(buffer), "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
@@ -11,7 +11,7 @@ std::wstring GUIDToString(const GUID & guid) {
 		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
 		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 	LOG_EXIT;
-	return std::wstring(buffer);
+	return std::string(buffer);
 }
 
 AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
