@@ -11,11 +11,11 @@ and which logs when a file is created and closed.
 class FileHandle {
 public:
 	FileHandle();
-	FileHandle(const std::wstring & path);
+	FileHandle(const std::string & path);
 	~FileHandle();
 	bool IsValid() const;
 	HANDLE Handle() const;
 private:
 	HANDLE handle_;
-	std::wstring path_;
+	std::string path_;
 };
