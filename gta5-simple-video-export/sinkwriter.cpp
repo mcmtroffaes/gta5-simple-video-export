@@ -123,7 +123,7 @@ STDAPI SinkWriterBeginWriting(
 	if (settings && audio_info && video_info) {
 		audio_info->UpdateSettings(*settings);
 		video_info->UpdateSettings(*settings);
-		std::wostringstream os;
+		std::ostringstream os;
 		settings->generate(os);
 		LOG->debug("settings before interpolation:\n{}", os.str());
 		settings->default_section(settings->sections["builtin"]);
