@@ -6,7 +6,7 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
-VideoStream::VideoStream(AVFormatContext* format_context, AVCodecID codec_id, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
+VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
 	: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }
 {
 	LOG_ENTER;

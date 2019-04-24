@@ -54,7 +54,7 @@ auto FindBestChannelLayout(const AVCodec* codec, uint64_t channel_layout) {
 	return best_layout;
 }
 
-AudioStream::AudioStream(AVFormatContext* format_context, AVCodecID codec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 	: Stream{ format_context, codec_id }
 	, sample_fmt{ sample_fmt }, sample_rate{ sample_rate }
 	, channel_layout{ channel_layout }, channels { av_get_channel_layout_nb_channels(channel_layout) }

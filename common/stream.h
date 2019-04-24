@@ -20,15 +20,15 @@ extern "C" {
 // It is important not to destroy the format context as long as the Stream object is in use.
 class Stream {
 public:
-	AVFormatContext* format_context; // context which owns this stream
-	AVStream* stream;                // the stream
-	AVCodecContext* context;         // codec context for this stream
-	AVFrame* frame;                  // the frame to be encoded
+	std::weak_ptr<AVFormatContext> owner; // context which owns this stream
+	AVStream* stream;                     // the stream
+	AVCodecContext* context;              // codec context for this stream
+	AVFrame* frame;                       // the frame to be encoded
 
 	// add stream to the given format context, and initialize codec context and frame
 	// note: frame buffer is not allocated (we do not know the stream format yet at this point)
 	// note: frame->pts is set to zero
-	Stream(AVFormatContext* format_context, AVCodecID codec_id);
+	Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id);
 
 	// send frame to the encoder
 	void Encode();

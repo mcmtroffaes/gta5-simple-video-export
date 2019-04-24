@@ -16,8 +16,8 @@ auto AVTsTimeString(uint64_t ts, AVRational* tb) {
 	return std::string(buffer);
 }
 
-Stream::Stream(AVFormatContext* format_context, AVCodecID codec_id)
-	: format_context{ format_context }, stream { nullptr }, context{ nullptr }, frame{ nullptr }
+Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id)
+	: owner{ format_context }, stream { nullptr }, context{ nullptr }, frame{ nullptr }
 {
 	LOG_ENTER;
 	if (!format_context)
@@ -25,7 +25,7 @@ Stream::Stream(AVFormatContext* format_context, AVCodecID codec_id)
 	const AVCodec* codec = avcodec_find_encoder(codec_id);
 	if (!codec)
 		LOG_THROW(std::invalid_argument, fmt::format("failed to find encoder with codec id {}", codec_id));
-	stream = avformat_new_stream(format_context, codec);
+	stream = avformat_new_stream(format_context.get(), codec);
 	if (!stream)
 		LOG_THROW(std::runtime_error, fmt::format("failed to allocate stream for codec {}", codec->name));
 	context = avcodec_alloc_context3(codec);
@@ -50,6 +50,8 @@ void Stream::Encode()
 		LOG->error("failed to send frame to encoder: {}", AVErrorString(ret_frame));
 	}
 	else {
+		// lock the format context (we will need it to write the packets)
+		auto format_context = owner.lock();
 		// get next packet from encoder
 		int ret_packet = avcodec_receive_packet(context, &pkt);
 		// ret_packet == 0 denotes success, keep writing as long as we have success
@@ -66,7 +68,7 @@ void Stream::Encode()
 				AVTsString(pkt.dts), AVTsTimeString(pkt.dts, time_base),
 				AVTsString(pkt.duration), AVTsTimeString(pkt.duration, time_base),
 				pkt.stream_index);
-			int ret_write = av_interleaved_write_frame(format_context, &pkt);
+			int ret_write = av_interleaved_write_frame(format_context.get(), &pkt);
 			if (ret_write < 0) {
 				LOG->error("failed to write packet to stream: {}", AVErrorString(ret_write));
 			}

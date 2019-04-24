@@ -7,7 +7,7 @@
 class Format
 {
 private:
-	AVFormatContext* context;
+	std::shared_ptr<AVFormatContext> context;
 
 public:
 	std::unique_ptr<VideoStream> vstream;
@@ -20,7 +20,5 @@ public:
 
 	// flush streams and write the footer
 	void Flush();
-
-	~Format();
 };
 
