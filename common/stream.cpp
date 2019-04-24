@@ -25,16 +25,18 @@ auto FindCodec(const AVCodecID& codec_id) {
 	return codec;
 }
 
-AVStream* StreamAlloc(std::shared_ptr<AVFormatContext>& format_context, const AVCodec* codec) {
+void AVStreamDeleter::operator()(AVStream* stream) {
+	// do nothing: memory is freed by the owning format context
+}
+
+AVStreamPtr CreateAVStream(const AVFormatContextPtr& format_context, const AVCodecPtr& codec) {
 	LOG_ENTER;
 	auto stream = avformat_new_stream(format_context.get(), codec);
 	if (!stream)
 		LOG_THROW(std::runtime_error, fmt::format("failed to allocate stream for {} codec", codec ? codec->name : "unknown"));
 	LOG_EXIT;
-	return stream;
+	return AVStreamPtr{ stream };
 }
-
-void StreamDeleter(AVStream* stream) { }
 
 auto CodecContextAlloc(const AVCodec* codec) {
 	LOG_ENTER;
@@ -64,7 +66,7 @@ void FrameDeleter(AVFrame* frame) {
 Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id)
 	: owner{ format_context }
 	, codec{ FindCodec(codec_id) }
-	, stream{ StreamAlloc(format_context, codec), StreamDeleter }
+	, stream{ CreateAVStream(format_context, codec) }
 	, context{ CodecContextAlloc(codec), CodecContextDeleter }
 	, frame{ FrameAlloc(), FrameDeleter }
 {

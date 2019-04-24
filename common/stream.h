@@ -6,6 +6,14 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
+struct AVStreamDeleter { void operator()(AVStream* stream); };
+
+using AVFormatContextPtr = std::shared_ptr<AVFormatContext>;
+using AVCodecPtr = const AVCodec*;
+using AVStreamPtr = std::unique_ptr<AVStream, AVStreamDeleter>;
+
+AVStreamPtr CreateAVStream(const AVFormatContextPtr& format_context, const AVCodecPtr& codec);
+
 // A class for encoding frames to an AVStream.
 // Usage:
 // * Create a format context with avformat_alloc_output_context2.
@@ -24,8 +32,8 @@ public:
 	using deleted_unique_ptr = std::unique_ptr<T, std::function<void(T*)>>;
 
 	std::weak_ptr<AVFormatContext> owner;       // context which owns this stream
-	const AVCodec* codec;                       // the codec
-	deleted_unique_ptr<AVStream> stream;        // the stream
+	AVCodecPtr codec;                           // the codec
+	AVStreamPtr stream;                         // the stream
 	deleted_unique_ptr<AVCodecContext> context; // codec context for this stream
 	deleted_unique_ptr<AVFrame> frame;          // a pre-allocated frame that can be used for encoding
 
