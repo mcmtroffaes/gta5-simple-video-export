@@ -74,7 +74,7 @@ Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec
 
 // encode and write the given frame to the stream
 // to flush the encoder, send a nullptr as frame
-void Stream::Encode(const deleted_unique_ptr<AVFrame>& avframe)
+void Stream::Encode(const AVFramePtr& avframe)
 {
 	LOG_ENTER;
 	AVPacket pkt;

@@ -34,14 +34,11 @@ AVFramePtr CreateAVFrame();
 // It is important not to destroy the format context as long as the Stream object is in use.
 class Stream {
 public:
-	template<typename T>
-	using deleted_unique_ptr = std::unique_ptr<T, std::function<void(T*)>>;
-
 	std::weak_ptr<AVFormatContext> owner;       // context which owns this stream
 	AVCodecPtr codec;                           // the codec
 	AVStreamPtr stream;                         // the stream
-	deleted_unique_ptr<AVCodecContext> context; // codec context for this stream
-	deleted_unique_ptr<AVFrame> frame;          // a pre-allocated frame that can be used for encoding
+	AVCodecContextPtr context; // codec context for this stream
+	AVFramePtr frame;          // a pre-allocated frame that can be used for encoding
 
 	// add stream to the given format context, and initialize codec context and frame
 	// note: frame buffer is not allocated (we do not know the stream format yet at this point)
@@ -49,7 +46,7 @@ public:
 	Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id);
 
 	// send frame to the encoder
-	void Encode(const deleted_unique_ptr<AVFrame>& avframe);
+	void Encode(const AVFramePtr& avframe);
 
 	// current frame time (in seconds)
 	double Time() const;
