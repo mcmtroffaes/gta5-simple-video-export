@@ -16,36 +16,69 @@ auto AVTsTimeString(uint64_t ts, AVRational* tb) {
 	return std::string(buffer);
 }
 
-Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id)
-	: owner{ format_context }, stream { nullptr }, context{ nullptr }, frame{ nullptr }
-{
+auto FindCodec(const AVCodecID& codec_id) {
 	LOG_ENTER;
-	if (!format_context)
-		LOG_THROW(std::invalid_argument, "format context cannot be null");
-	const AVCodec* codec = avcodec_find_encoder(codec_id);
+	auto codec = avcodec_find_encoder(codec_id);
 	if (!codec)
-		LOG_THROW(std::invalid_argument, fmt::format("failed to find encoder with codec id {}", codec_id));
-	stream = avformat_new_stream(format_context.get(), codec);
-	if (!stream)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate stream for codec {}", codec->name));
-	context = avcodec_alloc_context3(codec);
-	if (!context)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate context for codec {}", codec->name));
-	frame = av_frame_alloc();
-	if (!frame)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame"));
-	frame->pts = 0;
+		LOG_THROW(std::invalid_argument, fmt::format("failed find codec with id {}", codec_id));
 	LOG_EXIT;
+	return codec;
 }
 
-void Stream::Encode()
+AVStream* StreamAlloc(std::shared_ptr<AVFormatContext>& format_context, const AVCodec* codec) {
+	LOG_ENTER;
+	auto stream = avformat_new_stream(format_context.get(), codec);
+	if (!stream)
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate stream for {} codec", codec ? codec->name : "unknown"));
+	LOG_EXIT;
+	return stream;
+}
+
+void StreamDeleter(AVStream* stream) { }
+
+auto CodecContextAlloc(const AVCodec* codec) {
+	LOG_ENTER;
+	auto context = avcodec_alloc_context3(codec);
+	if (!context)
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate context for {} codec", codec ? codec->name : "unknown"));
+	LOG_EXIT;
+	return context;
+}
+
+void CodecContextDeleter(AVCodecContext* context) {
+	avcodec_free_context(&context);
+}
+
+auto FrameAlloc() {
+	auto frame = av_frame_alloc();
+	if (!frame)
+		LOG_THROW(std::runtime_error, "failed to allocate frame");
+	frame->pts = 0;
+	return frame;
+}
+
+void FrameDeleter(AVFrame* frame) {
+	av_frame_free(&frame);
+}
+
+Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id)
+	: owner{ format_context }
+	, codec{ FindCodec(codec_id) }
+	, stream{ StreamAlloc(format_context, codec), StreamDeleter }
+	, context{ CodecContextAlloc(codec), CodecContextDeleter }
+	, frame{ FrameAlloc(), FrameDeleter }
+{
+}
+
+// encode and write the given frame to the stream
+// to flush the encoder, send a nullptr as frame
+void Stream::Encode(const deleted_unique_ptr<AVFrame>& avframe)
 {
 	LOG_ENTER;
-	// note: frame can be null (e.g. on flush)
 	AVPacket pkt;
 	av_init_packet(&pkt);
 	// send frame for encoding
-	int ret_frame = avcodec_send_frame(context, frame);
+	int ret_frame = avcodec_send_frame(context.get(), avframe.get());
 	if (ret_frame < 0) {
 		LOG->error("failed to send frame to encoder: {}", AVErrorString(ret_frame));
 	}
@@ -53,7 +86,7 @@ void Stream::Encode()
 		// lock the format context (we will need it to write the packets)
 		auto format_context = owner.lock();
 		// get next packet from encoder
-		int ret_packet = avcodec_receive_packet(context, &pkt);
+		int ret_packet = avcodec_receive_packet(context.get(), &pkt);
 		// ret_packet == 0 denotes success, keep writing as long as we have success
 		while (!ret_packet) {
 			// we have to set the correct stream index
@@ -75,7 +108,7 @@ void Stream::Encode()
 			// clean up reference
 			av_packet_unref(&pkt);
 			// get next packet from encoder
-			ret_packet = avcodec_receive_packet(context, &pkt);
+			ret_packet = avcodec_receive_packet(context.get(), &pkt);
 		}
 		if (ret_packet != AVERROR(EAGAIN) && (ret_packet != AVERROR_EOF)) {
 			LOG->error("failed to receive packet from encoder: {}", AVErrorString(ret_packet));
@@ -84,25 +117,9 @@ void Stream::Encode()
 	LOG_EXIT;
 }
 
-void Stream::Flush()
-{
-	// flush by sending empty frame to encoder
-	av_frame_free(&frame);
-	Encode();
-}
-
 double Stream::Time() const
 {
 	LOG_ENTER;
 	return frame->pts * av_q2d(context->time_base);
-	LOG_EXIT;
-}
-
-Stream::~Stream()
-{
-	LOG_ENTER;
-	av_frame_free(&frame);
-	avcodec_free_context(&context);
-	stream = nullptr;
 	LOG_EXIT;
 }

@@ -85,10 +85,10 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	context->channels = av_get_channel_layout_nb_channels(context->channel_layout);
 	context->time_base = AVRational{ 1, context->sample_rate };
 	int ret = 0;
-	ret = avcodec_open2(context, NULL, NULL);
+	ret = avcodec_open2(context.get(), NULL, NULL);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to open audio codec: {}", AVErrorString(ret)));
-	avcodec_parameters_from_context(stream->codecpar, context);
+	avcodec_parameters_from_context(stream->codecpar, context.get());
 	// note: this is only a hint, actual stream time_base can be different
 	// avformat_write_header will set the final stream time_base
 	// see https://ffmpeg.org/doxygen/trunk/structAVStream.html#a9db755451f14e2bf590d4b85d82b32e6
@@ -99,7 +99,7 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	frame->channels = context->channels;
 	frame->nb_samples = (context->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) ? 1000 : context->frame_size;
 	LOG->debug("codec frame size is {}", frame->nb_samples);
-	ret = av_frame_get_buffer(frame, 0);
+	ret = av_frame_get_buffer(frame.get(), 0);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
 	swr = swr_alloc_set_opts(
@@ -164,7 +164,7 @@ void AudioStream::Transcode(uint8_t* ptr, int nb_samples)
 			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
 		if (nb_read != frame->nb_samples)
 			LOG->warn("expected {} samples from audio buffer but got {}", frame->nb_samples, nb_read);
-		Encode();
+		Encode(frame);
 		frame->pts += nb_read;
 	}
 	// flush buffer if needed
@@ -173,9 +173,9 @@ void AudioStream::Transcode(uint8_t* ptr, int nb_samples)
 		if (nb_read < 0)
 			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
 		frame->nb_samples = nb_read;
-		Encode();
+		Encode(frame);
 		frame->pts += nb_read;
-		Stream::Flush();
+		Encode(nullptr);
 		int nb_lost = av_audio_fifo_size(fifo);
 		if (nb_lost)
 			LOG->warn("audio buffer not completely flushed, {} samples lost");

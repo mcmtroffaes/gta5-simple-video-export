@@ -1,26 +1,30 @@
 #include "format.h"
 
-AVFormatContext* FormatContextAlloc(const std::string& filename) {
+auto FormatContextAlloc(const std::string& filename) {
+	LOG_ENTER;
 	AVFormatContext* context;
 	int ret = avformat_alloc_output_context2(&context, NULL, NULL, filename.c_str());
 	if (ret < 0 || !context)
 		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}': {}", filename, AVErrorString(ret)));
+	LOG_EXIT;
 	return context;
 }
 
 void FormatContextDeleter(AVFormatContext* context) {
+	LOG_ENTER;
 	if (context) {
 		avio_closep(&context->pb);
 		avformat_free_context(context);
 	}
+	LOG_EXIT;
 }
 
 Format::Format(const std::string& filename, AVCodecID vcodec, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt, AVCodecID acodec, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-	: context{ FormatContextAlloc(filename), FormatContextDeleter }, vstream{ nullptr }, astream{ nullptr }
+	: context{ FormatContextAlloc(filename), FormatContextDeleter }
+	, vstream{ new VideoStream(context, vcodec, width, height, frame_rate, pix_fmt) }
+	, astream{ new AudioStream(context, acodec, sample_fmt, sample_rate, channel_layout) }
 {
 	LOG_ENTER;
-	vstream.reset(new VideoStream(context, vcodec, width, height, frame_rate, pix_fmt));
-	astream.reset(new AudioStream(context, acodec, sample_fmt, sample_rate, channel_layout));
 	av_dump_format(context.get(), 0, filename.c_str(), 1);
 	// none of the above functions should set context to null, but just in case...
 	if (!context)
