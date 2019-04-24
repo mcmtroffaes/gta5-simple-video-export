@@ -11,6 +11,7 @@ struct AVCodecContextDeleter { void operator()(AVCodecContext* context) const; }
 struct AVFrameDeleter { void operator()(AVFrame* frame) const; };
 
 using AVFormatContextPtr = std::shared_ptr<AVFormatContext>;
+using AVFormatContextWeakPtr = std::weak_ptr<AVFormatContext>;
 using AVCodecPtr = const AVCodec*;
 using AVStreamPtr = std::unique_ptr<AVStream, AVStreamDeleter>;
 using AVCodecContextPtr = std::unique_ptr<AVCodecContext, AVCodecContextDeleter>;
@@ -34,11 +35,11 @@ AVFramePtr CreateAVFrame();
 // It is important not to destroy the format context as long as the Stream object is in use.
 class Stream {
 public:
-	std::weak_ptr<AVFormatContext> owner;       // context which owns this stream
-	AVCodecPtr codec;                           // the codec
-	AVStreamPtr stream;                         // the stream
-	AVCodecContextPtr context; // codec context for this stream
-	AVFramePtr frame;          // a pre-allocated frame that can be used for encoding
+	AVFormatContextWeakPtr owner; // context which owns this stream
+	AVCodecPtr codec;             // the codec
+	AVStreamPtr stream;           // the stream
+	AVCodecContextPtr context;    // codec context for this stream
+	AVFramePtr frame;             // a pre-allocated frame that can be used for encoding
 
 	// add stream to the given format context, and initialize codec context and frame
 	// note: frame buffer is not allocated (we do not know the stream format yet at this point)
