@@ -16,7 +16,7 @@ auto AVTsTimeString(uint64_t ts, AVRational* tb) {
 	return std::string(buffer);
 }
 
-auto FindCodec(const AVCodecID& codec_id) {
+AVCodecPtr CreateAVCodec(const AVCodecID& codec_id) {
 	LOG_ENTER;
 	auto codec = avcodec_find_encoder(codec_id);
 	if (!codec)
@@ -65,7 +65,7 @@ void AVFrameDeleter::operator()(AVFrame* frame) const {
 
 Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id)
 	: owner{ format_context }
-	, codec{ FindCodec(codec_id) }
+	, codec{ CreateAVCodec(codec_id) }
 	, stream{ CreateAVStream(*format_context, *codec) }
 	, context{ CreateAVCodecContext(*codec) }
 	, frame{ CreateAVFrame() }
