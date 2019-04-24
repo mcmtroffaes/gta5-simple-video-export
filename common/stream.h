@@ -16,8 +16,8 @@ using AVStreamPtr = std::unique_ptr<AVStream, AVStreamDeleter>;
 using AVCodecContextPtr = std::unique_ptr<AVCodecContext, AVCodecContextDeleter>;
 using AVFramePtr = std::unique_ptr<AVFrame, AVFrameDeleter>;
 
-AVStreamPtr CreateAVStream(const AVFormatContextPtr& format_context, const AVCodecPtr& codec);
-AVCodecContextPtr CreateAVCodecContext(const AVCodecPtr& codec);
+AVStreamPtr CreateAVStream(const AVFormatContext& format_context, const AVCodec& codec);
+AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec);
 AVFramePtr CreateAVFrame();
 
 // A class for encoding frames to an AVStream.
