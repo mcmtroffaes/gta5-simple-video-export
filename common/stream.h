@@ -6,13 +6,19 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
-struct AVStreamDeleter { void operator()(AVStream* stream); };
+struct AVStreamDeleter { void operator()(AVStream* stream) const; };
+struct AVCodecContextDeleter { void operator()(AVCodecContext* context) const; };
+struct AVFrameDeleter { void operator()(AVFrame* frame) const; };
 
 using AVFormatContextPtr = std::shared_ptr<AVFormatContext>;
 using AVCodecPtr = const AVCodec*;
 using AVStreamPtr = std::unique_ptr<AVStream, AVStreamDeleter>;
+using AVCodecContextPtr = std::unique_ptr<AVCodecContext, AVCodecContextDeleter>;
+using AVFramePtr = std::unique_ptr<AVFrame, AVFrameDeleter>;
 
 AVStreamPtr CreateAVStream(const AVFormatContextPtr& format_context, const AVCodecPtr& codec);
+AVCodecContextPtr CreateAVCodecContext(const AVCodecPtr& codec);
+AVFramePtr CreateAVFrame();
 
 // A class for encoding frames to an AVStream.
 // Usage:
