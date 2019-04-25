@@ -2,6 +2,8 @@
 
 #include "stream.h"
 
+AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt, uint8_t* ptr);
+
 class VideoStream :
 	public Stream
 {
