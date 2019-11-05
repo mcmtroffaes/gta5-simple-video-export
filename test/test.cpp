@@ -18,7 +18,7 @@ extern "C" {
 std::shared_ptr<spdlog::logger> logger = nullptr;
 std::unique_ptr<Settings> settings = nullptr;
 
-#define DATAY(S, X, Y, T) (uint8_t)(S * (X + Y) + T * 30)
+#define DATAY(S, X, Y, T) (uint8_t)(S * X + S * Y + T * 30)
 #define DATAU(S, X, Y, T) (uint8_t)(128 + S * Y + T * 20)
 #define DATAV(S, X, Y, T) (uint8_t)(64 + S * X + T * 50)
 
@@ -128,21 +128,27 @@ void Test(
 		filename,
 		vcodec_id, width, height, frame_rate, pix_fmt,
 		acodec_id, sample_fmt, sample_rate, channel_layout));
+	const auto atb = AVRational{ 1, sample_rate };
+	const auto vtb = av_inv_q(frame_rate);
 	int apts = 0;
-	while (format->astream->Time() < 5.0) {
-		while (format->vstream->Time() >= format->astream->Time()) {
+	int vpts = 0;
+	while (apts * av_q2d(atb) < 5.0) {
+		while (av_compare_ts(apts, atb, vpts, vtb) <= 0) {
 			const auto nb_samples = 1000;
 			auto adata = MakeAudioData(
 				sample_fmt, sample_rate, channel_layout,
 				nb_samples, apts);
-			format->astream->Transcode(adata.get(), nb_samples);
+			auto aframe = CreateAudioFrame(sample_fmt, sample_rate, channel_layout, nb_samples, adata.get());
+			format->astream->Transcode(aframe);
 			apts += nb_samples;
 		}
-		while (format->astream->Time() >= format->vstream->Time()) {
+		while (av_compare_ts(apts, atb, vpts, vtb) >= 0) {
 			auto vdata = MakeVideoData(
 				width, height, pix_fmt,
-				format->vstream->Time());
-			format->vstream->Transcode(vdata.get());
+				vpts * av_q2d(vtb));
+			auto vframe = CreateVideoFrame(width, height, pix_fmt, vdata.get());
+			format->vstream->Transcode(vframe);
+			vpts++;
 		}
 	}
 	format->Flush();
@@ -159,22 +165,26 @@ int main()
 	Test(
 		"test-ffv1-nv12-flac-s16.mkv",
 		AV_CODEC_ID_FFV1, AVRational{ 30000, 1001 }, AV_PIX_FMT_NV12,
-		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 10000, AV_CH_LAYOUT_STEREO);
+		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 48000, AV_CH_LAYOUT_STEREO);
 	Test(
 		"test-ffv1-yuv420-flac-flt.mkv",
 		AV_CODEC_ID_FFV1, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
-		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 10000, AV_CH_LAYOUT_STEREO);
+		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 48000, AV_CH_LAYOUT_STEREO);
 	Test(
-		"test-mpeg4-yuv420-aac-flt.mp4",
-		AV_CODEC_ID_MPEG4, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
-		AV_CODEC_ID_AAC, AV_SAMPLE_FMT_FLT, 10000, AV_CH_LAYOUT_STEREO);
+		"test-mpeg4-yuv420-aac-flt-48k.mp4",
+		AV_CODEC_ID_MPEG4, AVRational{ 60000, 1001 }, AV_PIX_FMT_YUV420P,
+		AV_CODEC_ID_AAC, AV_SAMPLE_FMT_FLT, 48000, AV_CH_LAYOUT_STEREO);
+	Test(
+		"test-mpeg4-yuv420-aac-flt-22k.mp4",
+		AV_CODEC_ID_MPEG4, AVRational{ 24000, 1001 }, AV_PIX_FMT_YUV420P,
+		AV_CODEC_ID_AAC, AV_SAMPLE_FMT_FLT, 22050, AV_CH_LAYOUT_STEREO);
 	try {
 		Test(
 			"test-unsupported-codec-in-container.mp4",
 			AV_CODEC_ID_MPEG4, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
-			AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 10000, AV_CH_LAYOUT_STEREO);
+			AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 48000, AV_CH_LAYOUT_STEREO);
 	}
-	catch (std::exception& e) {
+	catch (std::exception e) {
 		assert(std::string(e.what()).find("failed to write header") == 0);
 	}
 	LOG_EXIT;

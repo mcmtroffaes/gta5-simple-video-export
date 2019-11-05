@@ -32,7 +32,7 @@ AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt, uint8_
 }
 
 VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
-	: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }
+	: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }, dst_frame{ nullptr }
 {
 	LOG_ENTER;
 	if (context->codec->type != AVMEDIA_TYPE_VIDEO)
@@ -68,36 +68,38 @@ VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	// avformat_write_header will set the final stream time_base
 	// see https://ffmpeg.org/doxygen/trunk/structAVStream.html#a9db755451f14e2bf590d4b85d82b32e6
 	stream->time_base = context->time_base;
-	frame = CreateVideoFrame(width, height, context->pix_fmt);
+	dst_frame = CreateVideoFrame(width, height, context->pix_fmt);
+	dst_frame->pts = 0;
 	LOG_EXIT;
 }
 
-void VideoStream::Transcode(uint8_t* ptr)
+void VideoStream::Transcode(const AVFramePtr& src_frame)
 {
 	LOG_ENTER;
-	// we support passing a null ptr as a way of flushing the transcoder
-	if (!ptr) {
+	// nullptr means flushing the encoder
+	if (!src_frame) {
 		Encode(nullptr);
 		LOG_EXIT;
 		return;
 	}
-	auto src_frame = CreateVideoFrame(frame->width, frame->height, pix_fmt, ptr);
 	// fill frame with data given in ptr
 	// we use sws_scale to do this, this will also take care of any pixel format conversions
 	SwsContext* sws = sws_getContext(
-		frame->width, frame->height, pix_fmt,
-		frame->width, frame->height, context->pix_fmt,
+		src_frame->width, src_frame->height, (AVPixelFormat)src_frame->format,
+		dst_frame->width, dst_frame->height, (AVPixelFormat)dst_frame->format,
 		SWS_BICUBIC, nullptr, nullptr, nullptr);
 	if (!sws)
 		LOG_THROW(std::runtime_error, "failed to initialize pixel conversion context");
 	sws_scale(
 		sws,
 		src_frame->data, src_frame->linesize, 0, src_frame->height,
-		frame->data, frame->linesize);
+		dst_frame->data, dst_frame->linesize);
 	sws_freeContext(sws);
 	// now encode the frame
-	Encode(frame);
+	Encode(dst_frame);
+	// update destination frame timestamp
+	dst_frame->pts += 1;
 	// frame was sent, so update its presentation time stamp, for next encoding call
-	frame->pts += 1;
 	LOG_EXIT;
 }
+

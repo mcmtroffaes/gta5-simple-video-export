@@ -16,65 +16,11 @@ auto AVTsTimeString(uint64_t ts, AVRational* tb) {
 	return std::string(buffer);
 }
 
-AVCodecPtr CreateAVCodec(const AVCodecID& codec_id) {
-	LOG_ENTER;
-	auto codec = avcodec_find_encoder(codec_id);
-	if (!codec)
-		LOG_THROW(std::invalid_argument, fmt::format("failed find codec with id {}", codec_id));
-	LOG_EXIT;
-	return codec;
-}
-
-AVStreamPtr CreateAVStream(AVFormatContext& format_context, const AVCodec& codec) {
-	LOG_ENTER;
-	auto stream = avformat_new_stream(&format_context, &codec);
-	if (!stream)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate stream for {} codec", codec.name));
-	LOG_EXIT;
-	return AVStreamPtr{ stream };
-}
-
-void AVStreamDeleter::operator()(AVStream* stream) const {
-	// do nothing: memory is freed by the owning format context
-}
-
-AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec) {
-	LOG_ENTER;
-	auto context = avcodec_alloc_context3(&codec);
-	if (!context)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate context for {} codec", codec.name));
-	LOG_EXIT;
-	return AVCodecContextPtr{ context };
-}
-
-void AVCodecContextDeleter::operator()(AVCodecContext* context) const {
-	LOG_ENTER;
-	avcodec_free_context(&context);
-	LOG_EXIT;
-}
-
-AVFramePtr CreateAVFrame() {
-	LOG_ENTER;
-	auto frame = av_frame_alloc();
-	if (!frame)
-		LOG_THROW(std::runtime_error, "failed to allocate frame");
-	frame->pts = 0;
-	LOG_EXIT;
-	return AVFramePtr{ frame };
-}
-
-void AVFrameDeleter::operator()(AVFrame* frame) const {
-	LOG_ENTER;
-	av_frame_free(&frame);
-	LOG_EXIT;
-}
-
 Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id)
 	: owner{ format_context }
 	, codec{ CreateAVCodec(codec_id) }
 	, stream{ CreateAVStream(*format_context, *codec) }
 	, context{ CreateAVCodecContext(*codec) }
-	, frame{ CreateAVFrame() }
 {
 	LOG_ENTER;
 	LOG_EXIT;
@@ -82,13 +28,13 @@ Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec
 
 // encode and write the given frame to the stream
 // to flush the encoder, send a nullptr as frame
-void Stream::Encode(const AVFramePtr& avframe)
+void Stream::Encode(const AVFramePtr& frame)
 {
 	LOG_ENTER;
 	AVPacket pkt;
 	av_init_packet(&pkt);
 	// send frame for encoding
-	int ret_frame = avcodec_send_frame(context.get(), avframe.get());
+	int ret_frame = avcodec_send_frame(context.get(), frame.get());
 	if (ret_frame < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to send frame to encoder: {}", AVErrorString(ret_frame)));
 	// lock the format context (we will need it to write the packets)
@@ -121,12 +67,5 @@ void Stream::Encode(const AVFramePtr& avframe)
 	}
 	if (ret_packet != AVERROR(EAGAIN) && (ret_packet != AVERROR_EOF))
 		LOG_THROW(std::runtime_error, fmt::format("failed to receive packet from encoder: {}", AVErrorString(ret_packet)));
-	LOG_EXIT;
-}
-
-double Stream::Time() const
-{
-	LOG_ENTER;
-	return frame->pts * av_q2d(context->time_base);
 	LOG_EXIT;
 }

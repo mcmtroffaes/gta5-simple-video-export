@@ -1,25 +1,11 @@
 #pragma once
 
 #include "logger.h"
+#include "avcreate.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
 }
-
-struct AVStreamDeleter { void operator()(AVStream* stream) const; };
-struct AVCodecContextDeleter { void operator()(AVCodecContext* context) const; };
-struct AVFrameDeleter { void operator()(AVFrame* frame) const; };
-
-using AVFormatContextPtr = std::shared_ptr<AVFormatContext>;
-using AVFormatContextWeakPtr = std::weak_ptr<AVFormatContext>;
-using AVCodecPtr = const AVCodec*;
-using AVStreamPtr = std::unique_ptr<AVStream, AVStreamDeleter>;
-using AVCodecContextPtr = std::unique_ptr<AVCodecContext, AVCodecContextDeleter>;
-using AVFramePtr = std::unique_ptr<AVFrame, AVFrameDeleter>;
-
-AVStreamPtr CreateAVStream(const AVFormatContext& format_context, const AVCodec& codec);
-AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec);
-AVFramePtr CreateAVFrame();
 
 // A class for encoding frames to an AVStream.
 // Usage:
@@ -35,11 +21,10 @@ AVFramePtr CreateAVFrame();
 // It is important not to destroy the format context as long as the Stream object is in use.
 class Stream {
 public:
-	AVFormatContextWeakPtr owner; // context which owns this stream
+	std::weak_ptr<AVFormatContext> owner; // context which owns this stream
 	AVCodecPtr codec;             // the codec
 	AVStreamPtr stream;           // the stream
 	AVCodecContextPtr context;    // codec context for this stream
-	AVFramePtr frame;             // a pre-allocated frame that can be used for encoding
 
 	// add stream to the given format context, and initialize codec context and frame
 	// note: frame buffer is not allocated (we do not know the stream format yet at this point)
@@ -48,7 +33,4 @@ public:
 
 	// send frame to the encoder
 	void Encode(const AVFramePtr& avframe);
-
-	// current frame time (in seconds)
-	double Time() const;
 };

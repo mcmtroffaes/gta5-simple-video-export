@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="audiostream.h" />
+    <ClInclude Include="avcreate.h" />
     <ClInclude Include="format.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="settings.h" />
@@ -28,6 +29,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="audiostream.cpp" />
+    <ClCompile Include="avcreate.cpp" />
     <ClCompile Include="format.cpp" />
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="settings.cpp" />

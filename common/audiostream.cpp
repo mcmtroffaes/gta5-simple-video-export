@@ -1,5 +1,32 @@
 #include "audiostream.h"
 
+AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout) {
+	auto frame = CreateAVFrame();
+	frame->format = sample_fmt;
+	frame->sample_rate = sample_rate;
+	frame->channel_layout = channel_layout;
+	frame->channels = av_get_channel_layout_nb_channels(channel_layout);
+	return frame;
+}
+
+AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout, int nb_samples) {
+	auto frame = CreateAudioFrame(sample_fmt, sample_rate, channel_layout);
+	frame->nb_samples = nb_samples;
+	int ret = av_frame_get_buffer(frame.get(), 0);
+	if (ret < 0)
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
+	return frame;
+}
+
+AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout, int nb_samples, const uint8_t* ptr) {
+	auto frame = CreateAudioFrame(sample_fmt, sample_rate, channel_layout);
+	frame->nb_samples = nb_samples;
+	int ret = av_samples_fill_arrays(frame->data, frame->linesize, ptr, frame->channels, nb_samples, sample_fmt, 1);
+	if (ret < 0)
+		LOG_THROW(std::runtime_error, fmt::format("failed to fill audio sample arrays: {}", AVErrorString(ret)));
+	return frame;
+}
+
 auto GetChannelLayoutString(uint64_t channel_layout) {
 	char buf[64]{ 0 };
 	av_get_channel_layout_string(buf, sizeof(buf), 0, channel_layout);
@@ -54,51 +81,11 @@ auto FindBestChannelLayout(const AVCodec* codec, uint64_t channel_layout) {
 	return best_layout;
 }
 
-SwrContextPtr CreateSwrContext(
-	uint64_t out_channel_layout, AVSampleFormat out_sample_fmt, int out_sample_rate,
-	uint64_t in_channel_layout, AVSampleFormat in_sample_fmt, int in_sample_rate)
-{
-	LOG_ENTER;
-	auto swr = swr_alloc_set_opts(
-		NULL,
-		out_channel_layout, out_sample_fmt, out_sample_rate,
-		in_channel_layout, in_sample_fmt, in_sample_rate,
-		0, NULL);
-	if (!swr)
-		LOG_THROW(std::runtime_error, "failed to allocate resampling context");
-	int ret = swr_init(swr);
-	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to initialize resampling context: {}", AVErrorString(ret)));
-	LOG_EXIT;
-	return SwrContextPtr{ swr };
-}
-
-void SwrContextDeleter::operator()(SwrContext* swr) const {
-	LOG_ENTER;
-	swr_free(&swr);
-	LOG_EXIT;
-}
-
-AVAudioFifoPtr CreateAVAudioFifo(AVSampleFormat sample_fmt, int channels, int nb_samples) {
-	LOG_ENTER;
-	auto fifo = av_audio_fifo_alloc(sample_fmt, channels, nb_samples);
-	if (!fifo)
-		LOG_THROW(std::runtime_error, "failed to allocate audio buffer");
-	LOG_EXIT;
-	return AVAudioFifoPtr{ fifo };
-}
-
-void AVAudioFifoDeleter::operator()(AVAudioFifo* fifo) const {
-	LOG_ENTER;
-	av_audio_fifo_free(fifo);
-	LOG_EXIT;
-}
-
 AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 	: Stream{ format_context, codec_id }
 	, sample_fmt{ sample_fmt }, sample_rate{ sample_rate }
 	, channel_layout{ channel_layout }, channels { av_get_channel_layout_nb_channels(channel_layout) }
-	, swr{ nullptr }, fifo{ nullptr }
+	, dst_frame{ nullptr }, swr{ nullptr }, fifo{ nullptr }
 {
 	LOG_ENTER;
 	if (context->codec_type != AVMEDIA_TYPE_AUDIO)
@@ -133,79 +120,49 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	// avformat_write_header will set the final stream time_base
 	// see https://ffmpeg.org/doxygen/trunk/structAVStream.html#a9db755451f14e2bf590d4b85d82b32e6
 	stream->time_base = context->time_base;
-	frame->format = context->sample_fmt;
-	frame->sample_rate = context->sample_rate;
-	frame->channel_layout = context->channel_layout;
-	frame->channels = context->channels;
-	frame->nb_samples = (context->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) ? 1000 : context->frame_size;
-	LOG->debug("codec frame size is {}", frame->nb_samples);
-	ret = av_frame_get_buffer(frame.get(), 0);
-	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
+	int nb_samples = (context->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) ? 1000 : context->frame_size;
+	LOG->debug("codec frame size is {}", nb_samples);
+	dst_frame = CreateAudioFrame(context->sample_fmt, context->sample_rate, context->channel_layout, nb_samples);
 	swr = CreateSwrContext(
 		context->channel_layout, context->sample_fmt, context->sample_rate, // out
 		channel_layout, sample_fmt, sample_rate); // in
-	fifo = CreateAVAudioFifo(context->sample_fmt, context->channels, frame->nb_samples);
+	fifo = CreateAVAudioFifo(context->sample_fmt, context->channels, dst_frame->nb_samples);
 	LOG_EXIT;
 }
 
-void AudioStream::Transcode(uint8_t* ptr, int nb_samples)
+void AudioStream::Transcode(const AVFramePtr& src_frame)
 {
 	LOG_ENTER;
-	uint8_t* src_data[4]{ nullptr, nullptr, nullptr, nullptr };
-	int src_linesize[4]{ 0, 0, 0, 0 };
-	// convert source pointer to standard data/linesize format
-	// this fails if ptr is null (which happens for a flush), so check for that case
-	if (ptr) {
-		int ret = av_samples_fill_arrays(src_data, src_linesize, ptr, channels, nb_samples, sample_fmt, 1);
-		if (ret < 0)
-			LOG_THROW(std::runtime_error, fmt::format("failed to fill audio sample arrays: {}", AVErrorString(ret)));
-	}
-	// number of samples required in the destination buffer (to avoid buffering)
-	int dst_nb_samples = swr_get_out_samples(swr.get(), nb_samples);
-	if (dst_nb_samples < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to get number of samples from audio resampler: {}", AVErrorString(dst_nb_samples)));
-	// av_samples_alloc can fail if dst_nb_samples is zero
-	// so let's allocate at least one sample, even if we're flushing the audio buffer
-	if (dst_nb_samples == 0)
-		dst_nb_samples = 1;
-	// allocate destination buffer
-	uint8_t* dst_data[4];
-	int dst_linesize[4];
-	int ret = av_samples_alloc(dst_data, dst_linesize, context->channels, dst_nb_samples, context->sample_fmt, 0);
-	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate audio destination buffer: {}", AVErrorString(ret)));
+	// create frame for destination buffer
+	auto buf_frame = CreateAudioFrame(context->sample_fmt, context->sample_rate, context->channel_layout);
 	// resample source data to destination buffer
-	int nb_convert = swr_convert(swr.get(), dst_data, dst_nb_samples, (const uint8_t **)src_data, nb_samples);
-	if (nb_convert < 0) {
-		av_freep(&dst_data[0]);
-		LOG_THROW(std::runtime_error, fmt::format("resampling error: {}", AVErrorString(nb_convert)));
-	}
-	int nb_written = av_audio_fifo_write(fifo.get(), (void**) dst_data, nb_convert);
+	int ret = swr_convert_frame(swr.get(), buf_frame.get(), src_frame.get());
+	if (ret < 0)
+		LOG_THROW(std::runtime_error, fmt::format("resampling error: {}", AVErrorString(ret)));
+	// write destination buffer to fifo buffer
+	int nb_written = av_audio_fifo_write(fifo.get(), (void**) buf_frame->data, buf_frame->nb_samples);
 	if (nb_written < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to write to audio buffer: {}", AVErrorString(nb_written)));
-	if (nb_written != nb_convert)
-		LOG->warn("expected {} samples to be written to audio buffer but wrote {}", nb_convert, nb_written);
-	// free destination buffer
-	av_freep(&dst_data[0]);
-	// read from fifo buffer in chunks of frame->nb_samples, until no further chunks can be read
-	while (av_audio_fifo_size(fifo.get()) >= frame->nb_samples) {
-		int nb_read = av_audio_fifo_read(fifo.get(), (void**)frame->data, frame->nb_samples);
+	if (nb_written != buf_frame->nb_samples)
+		LOG->warn("expected {} samples to be written to audio buffer but wrote {}", buf_frame->nb_samples, nb_written);
+	// read from fifo buffer in chunks of dst_frame->nb_samples, until no further chunks can be read
+	while (av_audio_fifo_size(fifo.get()) >= dst_frame->nb_samples) {
+		int nb_read = av_audio_fifo_read(fifo.get(), (void**)dst_frame->data, dst_frame->nb_samples);
 		if (nb_read < 0)
 			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
-		if (nb_read != frame->nb_samples)
-			LOG->warn("expected {} samples from audio buffer but got {}", frame->nb_samples, nb_read);
-		Encode(frame);
-		frame->pts += nb_read;
+		if (nb_read != dst_frame->nb_samples)
+			LOG->warn("expected {} samples from audio buffer but got {}", dst_frame->nb_samples, nb_read);
+		Encode(dst_frame);
+		dst_frame->pts += nb_read;
 	}
 	// flush buffer if needed
-	if (!ptr) {
-		int nb_read = av_audio_fifo_read(fifo.get(), (void**)frame->data, frame->nb_samples);
+	if (!src_frame) {
+		int nb_read = av_audio_fifo_read(fifo.get(), (void**)dst_frame->data, dst_frame->nb_samples);
 		if (nb_read < 0)
 			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
-		frame->nb_samples = nb_read;
-		Encode(frame);
-		frame->pts += nb_read;
+		dst_frame->nb_samples = nb_read;
+		Encode(dst_frame);
+		dst_frame->pts += nb_read;
 		Encode(nullptr);
 		int nb_lost = av_audio_fifo_size(fifo.get());
 		if (nb_lost)
