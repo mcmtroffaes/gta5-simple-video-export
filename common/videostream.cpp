@@ -3,7 +3,6 @@
 extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
-#include <libswscale/swscale.h>
 }
 
 AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt) {
@@ -84,17 +83,14 @@ void VideoStream::Transcode(const AVFramePtr& src_frame)
 	}
 	// fill frame with data given in ptr
 	// we use sws_scale to do this, this will also take care of any pixel format conversions
-	SwsContext* sws = sws_getContext(
+	auto sws = CreateSwsContext(
 		src_frame->width, src_frame->height, (AVPixelFormat)src_frame->format,
 		dst_frame->width, dst_frame->height, (AVPixelFormat)dst_frame->format,
-		SWS_BICUBIC, nullptr, nullptr, nullptr);
-	if (!sws)
-		LOG_THROW(std::runtime_error, "failed to initialize pixel conversion context");
+		SWS_BICUBIC);
 	sws_scale(
-		sws,
+		sws.get(),
 		src_frame->data, src_frame->linesize, 0, src_frame->height,
 		dst_frame->data, dst_frame->linesize);
-	sws_freeContext(sws);
 	// now encode the frame
 	Encode(dst_frame);
 	// update destination frame timestamp

@@ -161,6 +161,8 @@ int main()
 {
 	AVLogSetCallback();
 	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
+	// logger->set_level(spdlog::level::debug);
+	// AVLogSetLevel(spdlog::level::debug);
 	LOG_ENTER;
 	Test(
 		"test-ffv1-nv12-flac-s16.mkv",

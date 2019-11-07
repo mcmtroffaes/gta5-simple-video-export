@@ -98,6 +98,24 @@ void SwrContextDeleter::operator()(SwrContext* swr) const {
 	LOG_EXIT;
 }
 
+SwsContextPtr CreateSwsContext(int srcW, int srcH, AVPixelFormat srcFormat, int dstW, int dstH, AVPixelFormat dstFormat, int flags) {
+	LOG_ENTER;
+	auto sws = sws_getContext(
+		srcW, srcH, srcFormat,
+		dstW, dstH, dstFormat,
+		flags, nullptr, nullptr, nullptr);
+	if (!sws)
+		LOG_THROW(std::runtime_error, "failed to initialize pixel conversion context");
+	LOG_EXIT;
+	return SwsContextPtr{ sws };
+}
+
+void SwsContextDeleter::operator()(SwsContext* sws) const {
+	LOG_ENTER;
+	sws_freeContext(sws);
+	LOG_EXIT;
+}
+
 AVAudioFifoPtr CreateAVAudioFifo(AVSampleFormat sample_fmt, int channels, int nb_samples) {
 	LOG_ENTER;
 	auto fifo = av_audio_fifo_alloc(sample_fmt, channels, nb_samples);

@@ -133,13 +133,13 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 void AudioStream::Transcode(const AVFramePtr& src_frame)
 {
 	LOG_ENTER;
-	// create frame for destination buffer
+	// create buffer frame
 	auto buf_frame = CreateAudioFrame(context->sample_fmt, context->sample_rate, context->channel_layout);
-	// resample source data to destination buffer
+	// resample source frame to buffer frame
 	int ret = swr_convert_frame(swr.get(), buf_frame.get(), src_frame.get());
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("resampling error: {}", AVErrorString(ret)));
-	// write destination buffer to fifo buffer
+	// save buffer frame to fifo buffer
 	int nb_written = av_audio_fifo_write(fifo.get(), (void**) buf_frame->data, buf_frame->nb_samples);
 	if (nb_written < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to write to audio buffer: {}", AVErrorString(nb_written)));
