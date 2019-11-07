@@ -165,6 +165,10 @@ int main()
 	// AVLogSetLevel(spdlog::level::debug);
 	LOG_ENTER;
 	Test(
+		"test-ffv1-yuv444-flac-s16.mkv",
+		AV_CODEC_ID_FFV1, AVRational{ 60000, 1001 }, AV_PIX_FMT_YUV444P,
+		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 48000, AV_CH_LAYOUT_STEREO);
+	Test(
 		"test-ffv1-nv12-flac-s16.mkv",
 		AV_CODEC_ID_FFV1, AVRational{ 30000, 1001 }, AV_PIX_FMT_NV12,
 		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 48000, AV_CH_LAYOUT_STEREO);
