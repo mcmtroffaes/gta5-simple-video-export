@@ -42,26 +42,6 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	LOG_EXIT;
 }
 
-void AudioInfo::UpdateSettings(Settings & settings) const {
-	LOG_ENTER;
-	auto & defsec = settings.sections["builtin"];
-	defsec["audio_rate"] = std::to_string(rate_);
-	defsec["audio_num_channels"] = std::to_string(num_channels_);
-	defsec["audio_bits_per_sample"] = std::to_string(bits_per_sample_);
-	const auto & audioformats = settings.GetSec("audioformats");
-	auto subtype_str = GUIDToString(subtype_);
-	auto format = audioformats.find(subtype_str);
-	if (format != audioformats.end()) {
-		defsec["audio_format"] = format->second;
-		LOG->info("audio format = {}", format->second);
-	}
-	else {
-		LOG->error("audio subtype = {} = unsupported", subtype_str);
-		LOG->error("please add an audioformats entry for {} in {}", subtype_str, settings.ini_filename_);
-	}
-	LOG_EXIT;
-}
-
 VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	: subtype_{ 0 }
 	, width_(UINT32_MAX)
@@ -83,53 +63,6 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	}
 	if (SUCCEEDED(hr)) {
 		LOG->info("video framerate = {}/{}", framerate_numerator_, framerate_denominator_);
-	}
-	LOG_EXIT;
-}
-
-void VideoInfo::UpdateSettings(Settings & settings) const {
-	LOG_ENTER;
-	auto & defsec = settings.sections["builtin"];
-	defsec["width"] = std::to_string(width_);
-	defsec["height"] = std::to_string(height_);
-	defsec["framerate_numerator"] = std::to_string(framerate_numerator_);
-	defsec["framerate_denominator"] = std::to_string(framerate_denominator_);
-	const auto & videoformats = settings.GetSec("videoformats");
-	auto subtype_str = GUIDToString(subtype_);
-	auto format = videoformats.find(subtype_str);
-	if (format != videoformats.end()) {
-		defsec["video_format"] = format->second;
-		LOG->info("video format = {}", format->second);
-	}
-	else {
-		LOG->error("video subtype = {} = unsupported", subtype_str);
-		LOG->error("please add a videoformats entry for {} in {}", subtype_str, settings.ini_filename_);
-	}
-	LOG_EXIT;
-}
-
-void CreateBatchFile(const Settings & settings)
-{
-	LOG_ENTER;
-	std::string batch_filename;
-	auto sec = settings.GetSec("raw");
-	if (settings.GetVar(sec, "batch_filename", batch_filename)) {
-		std::string batch_command;
-		if (settings.GetVar(sec, "batch_command", batch_command)) {
-			LOG->info("creating {}; run this file to process the raw output", batch_filename);
-			// TODO turn batch_filename into a UTF16 encoded wstring
-			std::ofstream os(batch_filename, std::ios::out | std::ios::trunc);
-			os << "@echo off" << std::endl;
-			os << batch_command << std::endl;
-			os << "pause" << std::endl;
-			os.close();
-		}
-		else {
-			LOG->error("batch_command not set; no batch file will be created");
-		}
-	}
-	else {
-		LOG->error("batch_filename not set; no batch file will be created");
 	}
 	LOG_EXIT;
 }

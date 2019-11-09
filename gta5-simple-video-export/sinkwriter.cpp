@@ -27,6 +27,7 @@ unhook all the SinkWriter hooks (this will also close all files).
 #include "settings.h"
 #include "hook.h"
 #include "info.h"
+#include "format.h"
 
 #include <wrl/client.h> // ComPtr
 
@@ -45,6 +46,7 @@ std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
+std::unique_ptr<Format> format = nullptr;
 
 void UnhookVFuncDetours()
 {
@@ -121,22 +123,25 @@ STDAPI SinkWriterBeginWriting(
 	auto hr = original_func(pThis);
 	LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
 	if (settings && audio_info && video_info) {
-		audio_info->UpdateSettings(*settings);
-		video_info->UpdateSettings(*settings);
 		std::ostringstream os;
 		settings->generate(os);
 		LOG->debug("settings before interpolation:\n{}", os.str());
-		settings->default_section(settings->sections["builtin"]);
 		settings->interpolate();
 		os.str("");
 		settings->generate(os);
 		LOG->debug("settings after interpolation:\n{}", os.str());
-		auto rawsec = settings->GetSec("raw");
-		std::string audio_filename{ };
-		std::string video_filename{ };
-		settings->GetVar(rawsec, "audio_filename", audio_filename);
-		settings->GetVar(rawsec, "video_filename", video_filename);
-		CreateBatchFile(*settings);
+		auto exportsec = settings->GetSec("export");
+		std::string preset{ };
+		std::string folder{ };
+		std::string filebase{ };
+		settings->GetVar(exportsec, "preset", preset);
+		settings->GetVar(exportsec, "folder", folder);
+		settings->GetVar(exportsec, "filebase", filebase);
+		auto presetsec = settings->GetSec(preset);
+		std::string container{ };
+		settings->GetVar(presetsec, "container", container);
+		// TODO set up the Format
+		format.reset(); // new Format(folder + "\\" + filebase + "." + container, ...)
 	}
 	LOG_EXIT;
 	return hr;

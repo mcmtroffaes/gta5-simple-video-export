@@ -42,7 +42,6 @@ private:
 public:
 	DWORD stream_index_;
 	AudioInfo(DWORD stream_index, IMFMediaType & input_media_type);
-	void UpdateSettings(Settings & settings) const;
 };
 
 class VideoInfo {
@@ -55,7 +54,4 @@ private:
 public:
 	DWORD stream_index_;
 	VideoInfo(DWORD stream_index, IMFMediaType & input_media_type);
-	void UpdateSettings(Settings & settings) const;
 };
-
-void CreateBatchFile(const Settings & settings);
