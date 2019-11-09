@@ -2,12 +2,12 @@
 Classes to store information about the export.
 
 AudioInfo stores information about the audio format (bit rate, number of
-channels, and so on). It also stores the handle to the raw audio file, and the
+channels, and so on). It also stores the
 media foundation stream index. This information is initialized in the
 SinkWriterSetInputMediaType hook  (search for "audio_info.reset").
 
 VideoInfo stores information about the video format (resolution, framerate,
-and so on). It also stores the handle to the raw video file, and the
+and so on). It also stores the handle to the
 media foundation stream index. This information is initialized in the
 SinkWriterSetInputMediaType hook  (search for "video_info.reset").
 
@@ -28,8 +28,8 @@ batch_command specified by the user in the ini file.
 
 #include "logger.h"
 #include "settings.h"
-#include "filehandle.h"
 
+#include <windows.h>
 #include <mfapi.h>
 #pragma comment(lib, "mfuuid.lib")
 
@@ -41,7 +41,6 @@ private:
 	uint32_t bits_per_sample_;
 public:
 	DWORD stream_index_;
-	std::unique_ptr<FileHandle> handle_;
 	AudioInfo(DWORD stream_index, IMFMediaType & input_media_type);
 	void UpdateSettings(Settings & settings) const;
 };
@@ -55,7 +54,6 @@ private:
 	uint32_t framerate_denominator_;
 public:
 	DWORD stream_index_;
-	std::unique_ptr<FileHandle> handle_;
 	VideoInfo(DWORD stream_index, IMFMediaType & input_media_type);
 	void UpdateSettings(Settings & settings) const;
 };

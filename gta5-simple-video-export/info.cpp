@@ -20,7 +20,6 @@ AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	, num_channels_(UINT32_MAX)
 	, bits_per_sample_(UINT32_MAX)
 	, stream_index_(stream_index)
-	, handle_(nullptr)
 {
 	LOG_ENTER;
 	LOG->debug("audio stream index = {}", stream_index_);
@@ -70,7 +69,6 @@ VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
 	, framerate_numerator_(UINT32_MAX)
 	, framerate_denominator_(UINT32_MAX)
 	, stream_index_(stream_index)
-	, handle_(nullptr)
 {
 	LOG_ENTER;
 	LOG->debug("video stream index = {}", stream_index_);

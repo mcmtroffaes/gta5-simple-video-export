@@ -136,8 +136,6 @@ STDAPI SinkWriterBeginWriting(
 		std::string video_filename{ };
 		settings->GetVar(rawsec, "audio_filename", audio_filename);
 		settings->GetVar(rawsec, "video_filename", video_filename);
-		audio_info->handle_.reset(new FileHandle(audio_filename));
-		video_info->handle_.reset(new FileHandle(video_filename));
 		CreateBatchFile(*settings);
 	}
 	LOG_EXIT;
@@ -179,14 +177,14 @@ STDAPI SinkWriterWriteSample(
 	LOG_ENTER;
 	auto hr = S_OK;
 	// write our audio or video sample; note: this will clear the sample as well
-	if (audio_info && audio_info->handle_ && audio_info->handle_->IsValid()) {
+	if (audio_info) {
 		if (dwStreamIndex == audio_info->stream_index_) {
-			WriteSample(pSample, audio_info->handle_->Handle());
+			WriteSample(pSample, nullptr);
 		}
 	}
-	if (video_info && video_info->handle_ && video_info->handle_->IsValid()) {
+	if (video_info) {
 		if (dwStreamIndex == video_info->stream_index_) {
-			WriteSample(pSample, video_info->handle_->Handle());
+			WriteSample(pSample, nullptr);
 		}
 	}
 	// call original function
