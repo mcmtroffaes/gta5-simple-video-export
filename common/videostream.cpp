@@ -95,7 +95,6 @@ void VideoStream::Transcode(const AVFramePtr& src_frame)
 	Encode(dst_frame);
 	// update destination frame timestamp
 	dst_frame->pts += 1;
-	// frame was sent, so update its presentation time stamp, for next encoding call
 	LOG_EXIT;
 }
 

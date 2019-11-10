@@ -123,10 +123,10 @@ VideoInfo::VideoInfo(DWORD stream_index_, IMFMediaType & input_media_type)
 {
 	LOG_ENTER;
 	GUID subtype{ 0 };
-	UINT32 width_u32;
-	UINT32 height_u32;
-	UINT32 frame_rate_numerator;
-	UINT32 frame_rate_denominator;
+	UINT32 width_u32{ 0 };
+	UINT32 height_u32{ 0 };
+	UINT32 frame_rate_numerator{ 0 };
+	UINT32 frame_rate_denominator{ 1 };
 	LOG->debug("video stream index = {}", stream_index_);
 	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
 	if (FAILED(hr)) {
