@@ -57,6 +57,7 @@ void UnhookVFuncDetours()
 	finalize_hook = nullptr;
 	audio_info = nullptr;
 	video_info = nullptr;
+	format = nullptr;
 	LOG_EXIT;
 }
 
@@ -139,39 +140,27 @@ STDAPI SinkWriterBeginWriting(
 		settings->GetVar(exportsec, "filebase", filebase);
 		auto presetsec = settings->GetSec(preset);
 		std::string container{ };
+		std::string videocodec_name{ };
+		std::string audiocodec_name{ };
 		settings->GetVar(presetsec, "container", container);
-		// TODO set up the Format
-		format.reset(); // new Format(folder + "\\" + filebase + "." + container, ...)
+		settings->GetVar(presetsec, "videocodec", videocodec_name);
+		settings->GetVar(presetsec, "audiocodec", audiocodec_name);
+		auto videocodec = avcodec_find_encoder_by_name(videocodec_name.c_str());
+		auto audiocodec = avcodec_find_encoder_by_name(audiocodec_name.c_str());
+		if (!videocodec)
+			LOG->error("video codec {} not supported", videocodec_name);
+		if (!audiocodec)
+			LOG->error("audio codec {} not supported", audiocodec_name);
+		auto videocodec_id = videocodec ? videocodec->id : AV_CODEC_ID_NONE;
+		auto audiocodec_id = audiocodec ? audiocodec->id : AV_CODEC_ID_NONE;
+		std::string filename{ folder + "\\" + filebase + "." + container };
+		format.reset(new Format(
+			filename,
+			videocodec_id, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
+			audiocodec_id, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout));
 	}
 	LOG_EXIT;
 	return hr;
-}
-
-DWORD WriteSample(IMFSample *sample, HANDLE handle) {
-	LOG_ENTER;
-	ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
-	BYTE *p_buffer = nullptr;
-	DWORD buffer_length = 0;
-	auto hr = sample->ConvertToContiguousBuffer(p_media_buffer.GetAddressOf());
-	if (SUCCEEDED(hr))
-	{
-		auto hr = p_media_buffer->Lock(&p_buffer, NULL, &buffer_length);
-	}
-	if (SUCCEEDED(hr))
-	{
-		LOG->debug("writing {} bytes", buffer_length);
-		DWORD num_bytes_written = 0;
-		if (!WriteFile(handle, (const char *)p_buffer, buffer_length, &num_bytes_written, NULL)) {
-			LOG->error("writing failed");
-		}
-		if (num_bytes_written != buffer_length) {
-			LOG->error("only written {} bytes out of {} bytes", num_bytes_written, buffer_length);
-		}
-		memset(p_buffer, 0, buffer_length); // clear sample so game will output blank video/audio
-		hr = p_media_buffer->Unlock();
-	}
-	return buffer_length;
-	LOG_EXIT;
 }
 
 STDAPI SinkWriterWriteSample(
@@ -180,17 +169,38 @@ STDAPI SinkWriterWriteSample(
 	IMFSample     *pSample)
 {
 	LOG_ENTER;
-	auto hr = S_OK;
 	// write our audio or video sample; note: this will clear the sample as well
-	if (audio_info) {
-		if (dwStreamIndex == audio_info->stream_index_) {
-			WriteSample(pSample, nullptr);
-		}
+	ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
+	BYTE *p_buffer = nullptr;
+	DWORD buffer_length = 0;
+	auto hr = pSample->ConvertToContiguousBuffer(p_media_buffer.GetAddressOf());
+	if (SUCCEEDED(hr))
+	{
+		hr = p_media_buffer->Lock(&p_buffer, NULL, &buffer_length);
 	}
-	if (video_info) {
-		if (dwStreamIndex == video_info->stream_index_) {
-			WriteSample(pSample, nullptr);
+	if (SUCCEEDED(hr))
+	{
+		if (audio_info && dwStreamIndex == audio_info->stream_index) {
+			LOG->debug("transcoding {} bytes to audio stream", buffer_length);
+			int bytes_per_sample = av_get_bytes_per_sample(audio_info->sample_fmt);
+			int nb_channels = av_get_channel_layout_nb_channels(audio_info->channel_layout);
+			int nb_samples = buffer_length / (bytes_per_sample * nb_channels);
+			if (buffer_length != nb_samples * bytes_per_sample * nb_channels)
+				LOG->warn("buffer length {} not a multiple of bytes per sample {} and number of channels {}",
+					buffer_length, bytes_per_sample, nb_channels);
+			auto frame = CreateAudioFrame(
+				audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout, nb_samples, p_buffer);
+			format->astream->Transcode(frame);
 		}
+		if (video_info && dwStreamIndex == video_info->stream_index) {
+			LOG->debug("transcoding {} bytes to video stream", buffer_length);
+			// TODO check buffer length
+			auto frame = CreateVideoFrame(
+				video_info->width, video_info->height, video_info->pix_fmt, p_buffer);
+			format->vstream->Transcode(frame);
+		}
+		memset(p_buffer, 0, buffer_length); // clear sample so game will output blank video/audio
+		hr = p_media_buffer->Unlock();
 	}
 	// call original function
 	if (!writesample_hook) {
@@ -209,6 +219,8 @@ STDAPI SinkWriterFinalize(
 	IMFSinkWriter *pThis)
 {
 	LOG_ENTER;
+	LOG->info("flushing transcoder");
+	format->Flush();
 	if (!finalize_hook) {
 		LOG->error("IMFSinkWriter::Finalize hook not set up");
 		return E_FAIL;

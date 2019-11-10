@@ -3,6 +3,10 @@
 #include <fstream>
 #include <sstream>
 
+extern "C" {
+#include <libavutil/pixdesc.h>
+}
+
 auto GUIDToString(const GUID & guid) {
 	LOG_ENTER;
 	char buffer[48];
@@ -14,55 +18,146 @@ auto GUIDToString(const GUID & guid) {
 	return std::string(buffer);
 }
 
-AudioInfo::AudioInfo(DWORD stream_index, IMFMediaType & input_media_type)
-	: subtype_{ 0 }
-	, rate_(UINT32_MAX)
-	, num_channels_(UINT32_MAX)
-	, bits_per_sample_(UINT32_MAX)
-	, stream_index_(stream_index)
+auto GetAVSampleFmt(const GUID& subtype, UINT32 bits_per_sample) {
+	if (subtype == MFAudioFormat_PCM) {
+		switch (bits_per_sample) {
+		case 8:
+			return AV_SAMPLE_FMT_U8;
+		case 16:
+			return AV_SAMPLE_FMT_S16;
+		case 32:
+			return AV_SAMPLE_FMT_S32;
+		case 64:
+			return AV_SAMPLE_FMT_S64;
+		}
+	}
+	else if (subtype == MFAudioFormat_Float) {
+		switch (bits_per_sample) {
+		case 32:
+			return AV_SAMPLE_FMT_FLT;
+		case 64:
+			return AV_SAMPLE_FMT_DBL;
+		}
+	}
+	return AV_SAMPLE_FMT_NONE;
+}
+
+auto GetAVPixFmt(const GUID& subtype) {
+	if (subtype == MFVideoFormat_NV12) {
+		return AV_PIX_FMT_NV12;
+	}
+	else if (subtype == MFVideoFormat_I420 || subtype == MFVideoFormat_IYUV) {
+		return AV_PIX_FMT_YUV420P;
+	}
+	else if (subtype == MFVideoFormat_YUY2) {
+		return AV_PIX_FMT_YUYV422;
+	}
+	else if (subtype == MFVideoFormat_RGB24) {
+		return AV_PIX_FMT_RGB24;
+	}
+	return AV_PIX_FMT_NONE;
+}
+
+AudioInfo::AudioInfo(DWORD stream_index_, IMFMediaType & input_media_type)
+	: sample_fmt{ AV_SAMPLE_FMT_NONE }
+	, sample_rate{ 0 }
+	, channel_layout{ 0 }
+	, stream_index{ stream_index_ }
 {
 	LOG_ENTER;
-	LOG->debug("audio stream index = {}", stream_index_);
-	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype_);
-	if (SUCCEEDED(hr)) {
-		LOG->info("audio subtype = {}", GUIDToString(subtype_));
-		hr = input_media_type.GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &rate_);
+	GUID subtype{ 0 };
+	UINT32 sample_rate_u32{ 0 };
+	UINT32 nb_channels{ 0 };
+	UINT32 bits_per_sample{ 0 };
+	LOG->debug("audio stream index = {}", stream_index);
+	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
+	if (FAILED(hr)) {
+		LOG->error("failed to get audio subtype");
 	}
-	if (SUCCEEDED(hr)) {
-		LOG->info("audio rate = {}", rate_);
-		hr = input_media_type.GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &num_channels_);
+	else {
+		LOG->info("audio subtype = {}", GUIDToString(subtype));
 	}
-	if (SUCCEEDED(hr)) {
-		LOG->info("audio num channels = {}", num_channels_);
-		hr = input_media_type.GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &bits_per_sample_);
+	hr = input_media_type.GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &sample_rate_u32);
+	if (FAILED(hr)) {
+		LOG->error("failed to get audio sample rate");
 	}
-	if (SUCCEEDED(hr)) {
-		LOG->info("audio bits per sample = {}", bits_per_sample_);
+	else {
+		sample_rate = sample_rate_u32;
+		LOG->info("audio sample rate = {}", sample_rate);
 	}
+	hr = input_media_type.GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &nb_channels);
+	if (FAILED(hr)) {
+		LOG->error("failed to get audio num channels");
+	}
+	else {
+		LOG->info("audio num channels = {}", nb_channels);
+		channel_layout = av_get_default_channel_layout(nb_channels);
+		char buf[256];
+		av_get_channel_layout_string(buf, sizeof(buf), nb_channels, channel_layout);
+		LOG->info("audio channel layout = {}", buf);
+		// sanity check
+		if (av_get_channel_layout_nb_channels(channel_layout) != nb_channels) {
+			LOG->warn("channel layout does not match num channels");
+		}
+	}
+	hr = input_media_type.GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &bits_per_sample);
+	if (SUCCEEDED(hr)) {
+		LOG->info("audio bits per sample = {}", bits_per_sample);
+	}
+	sample_fmt = GetAVSampleFmt(subtype, bits_per_sample);
+	if (sample_fmt != AV_SAMPLE_FMT_NONE) {
+		LOG->info("audio sample format = {}", av_get_sample_fmt_name(sample_fmt));
+	}
+	else {
+		LOG->error("failed to identify audio sample format");
+	};
 	LOG_EXIT;
 }
 
-VideoInfo::VideoInfo(DWORD stream_index, IMFMediaType & input_media_type)
-	: subtype_{ 0 }
-	, width_(UINT32_MAX)
-	, height_(UINT32_MAX)
-	, framerate_numerator_(UINT32_MAX)
-	, framerate_denominator_(UINT32_MAX)
-	, stream_index_(stream_index)
+VideoInfo::VideoInfo(DWORD stream_index_, IMFMediaType & input_media_type)
+	: width{ 0 }
+	, height{ 0 }
+	, frame_rate{ 0, 1 }
+	, pix_fmt{ AV_PIX_FMT_NONE }
+	, stream_index{ stream_index_ }
 {
 	LOG_ENTER;
+	GUID subtype{ 0 };
+	UINT32 width_u32;
+	UINT32 height_u32;
+	UINT32 frame_rate_numerator;
+	UINT32 frame_rate_denominator;
 	LOG->debug("video stream index = {}", stream_index_);
-	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype_);
-	if (SUCCEEDED(hr)) {
-		LOG->info("video subtype = {}", GUIDToString(subtype_));
-		hr = MFGetAttributeSize(&input_media_type, MF_MT_FRAME_SIZE, &width_, &height_);
+	auto hr = input_media_type.GetGUID(MF_MT_SUBTYPE, &subtype);
+	if (FAILED(hr)) {
+		LOG->error("failed to get video subtype");
 	}
-	if (SUCCEEDED(hr)) {
-		LOG->info("video size = {}x{}", width_, height_);
-		hr = MFGetAttributeRatio(&input_media_type, MF_MT_FRAME_RATE, &framerate_numerator_, &framerate_denominator_);
+	else {
+		LOG->info("video subtype = {}", GUIDToString(subtype));
 	}
-	if (SUCCEEDED(hr)) {
-		LOG->info("video framerate = {}/{}", framerate_numerator_, framerate_denominator_);
+	hr = MFGetAttributeSize(&input_media_type, MF_MT_FRAME_SIZE, &width_u32, &height_u32);
+	if (FAILED(hr)) {
+		LOG->error("failed to get video frame size");
+	}
+	else {
+		width = width_u32;
+		height = height_u32;
+		LOG->info("video frame size = {}x{}", width, height);
+	}
+	hr = MFGetAttributeRatio(&input_media_type, MF_MT_FRAME_RATE, &frame_rate_numerator, &frame_rate_denominator);
+	if (FAILED(hr)) {
+		LOG->error("failed to get video frame rate");
+	}
+	else {
+		frame_rate = AVRational{ (int)frame_rate_numerator, (int)frame_rate_denominator };
+		LOG->info("video frame rate = {}/{}", frame_rate_numerator, frame_rate_denominator);
+	}
+	pix_fmt = GetAVPixFmt(subtype);
+	if (pix_fmt != AV_PIX_FMT_NONE) {
+		LOG->info("video pixel format = {}", av_get_pix_fmt_name(pix_fmt));
+	}
+	else {
+		LOG->error("failed to identify video pixel format");
 	}
 	LOG_EXIT;
 }

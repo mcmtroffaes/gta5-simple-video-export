@@ -33,25 +33,25 @@ batch_command specified by the user in the ini file.
 #include <mfapi.h>
 #pragma comment(lib, "mfuuid.lib")
 
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
+
 class AudioInfo {
-private:
-	GUID subtype_;
-	uint32_t rate_;
-	uint32_t num_channels_;
-	uint32_t bits_per_sample_;
 public:
-	DWORD stream_index_;
-	AudioInfo(DWORD stream_index, IMFMediaType & input_media_type);
+	AVSampleFormat sample_fmt;
+	int sample_rate;
+	uint64_t channel_layout;
+	DWORD stream_index;
+	AudioInfo(DWORD stream_index, IMFMediaType& input_media_type);
 };
 
 class VideoInfo {
-private:
-	GUID subtype_;
-	uint32_t width_;
-	uint32_t height_;
-	uint32_t framerate_numerator_;
-	uint32_t framerate_denominator_;
 public:
-	DWORD stream_index_;
-	VideoInfo(DWORD stream_index, IMFMediaType & input_media_type);
+	int width;
+	int height;
+	AVRational frame_rate;
+	AVPixelFormat pix_fmt;
+	DWORD stream_index;
+	VideoInfo(DWORD stream_index, IMFMediaType& input_media_type);
 };
