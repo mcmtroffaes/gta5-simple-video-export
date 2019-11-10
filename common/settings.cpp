@@ -5,6 +5,10 @@
 #include <iomanip>
 #include <sstream>
 
+extern "C" {
+#include <libavformat/avformat.h>
+}
+
 #ifdef _WIN32
 #include <ShlObj.h> // SHGetKnownFolderPath
 
@@ -53,6 +57,9 @@ std::string TimeStamp()
 const std::string Settings::ini_filename_ = SCRIPT_NAME ".ini";
 
 Settings::Settings()
+	: export_filename{}
+	, video_codec_id{ AV_CODEC_ID_NONE }
+	, audio_codec_id{ AV_CODEC_ID_NONE }
 {
 	// LOG_ENTER is deferred until the log level is set
 	LOG->debug("parsing {}", ini_filename_);
@@ -80,21 +87,63 @@ Settings::Settings()
 	}
 	AVLogSetLevel(level);
 	LOG_ENTER;
-	Section & secdef = sections["builtin"];
+	Section & builtinsec = sections["builtin"];
 	auto timestamp = TimeStamp();
-	secdef["timestamp"] = timestamp;
+	builtinsec["timestamp"] = timestamp;
 	LOG->debug("timestamp = {}", timestamp);
 #ifdef _WIN32
 	auto docs = GetKnownFolder(FOLDERID_Documents);
 	auto vids = GetKnownFolder(FOLDERID_Videos);
 	auto desk = GetKnownFolder(FOLDERID_Desktop);
-	secdef["documentsfolder"] = docs;
-	secdef["videosfolder"] = vids;
-	secdef["desktopfolder"] = desk;
+	builtinsec["documentsfolder"] = docs;
+	builtinsec["videosfolder"] = vids;
+	builtinsec["desktopfolder"] = desk;
 	LOG->debug("documentsfolder = {}", docs);
 	LOG->debug("videosfolder = {}", vids);
 	LOG->debug("desktopfolder = {}", desk);
 #endif
+	// interpolate all variables
+	interpolate();
+	// set up a valid filename
+	auto exportsec = GetSec("export");
+	std::string folder{ "." };
+	std::string basename{ "sve-" + timestamp };
+	std::string preset{ };
+	GetVar(exportsec, "folder", folder);
+	GetVar(exportsec, "basename", basename);
+	GetVar(exportsec, "preset", preset);
+	auto presetsec = GetSec(preset);
+	std::string container{ "mp4" };
+	GetVar(presetsec, "container", container);
+	export_filename = folder + "\\" + basename + "." + container;
+	auto oformat = av_guess_format(nullptr, export_filename.c_str(), nullptr);
+	if (!oformat) {
+		LOG->error("container format {} not supported, falling back to mp4", container);
+		export_filename = folder + "\\" + basename + ".mp4";
+		oformat = av_guess_format(nullptr, export_filename.c_str(), nullptr);
+		if (!oformat)
+			LOG_THROW(std::runtime_error, "mp4 output format not supported");
+	}
+	// set up valid video codec
+	std::string videocodec_name{ };
+	GetVar(presetsec, "videocodec", videocodec_name);
+	auto videocodec = avcodec_find_encoder_by_name(videocodec_name.c_str());
+	auto videocodec_fallback = oformat->video_codec;
+	if (!videocodec)
+		LOG->error(
+			"video codec {} not supported, falling back to {}",
+			videocodec_name, avcodec_get_name(videocodec_fallback));
+	video_codec_id = videocodec ? videocodec->id : videocodec_fallback;
+	// set up valid audio codec
+	std::string audiocodec_name{ };
+	GetVar(presetsec, "audiocodec", audiocodec_name);
+	auto audiocodec = avcodec_find_encoder_by_name(audiocodec_name.c_str());
+	auto audiocodec_fallback = oformat->audio_codec;
+	if (!audiocodec)
+		LOG->error(
+			"audio codec {} not supported, falling back to {}",
+			audiocodec_name, avcodec_get_name(audiocodec_fallback));
+	audio_codec_id = audiocodec ? audiocodec->id : audiocodec_fallback;
 	LOG_EXIT;
 }
 

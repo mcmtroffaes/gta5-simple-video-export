@@ -84,28 +84,64 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 		auto two_pi_time = (2.0 * M_PI * (pts + j)) / sample_rate;
 		rawdata[j] = sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time) * sin(freq3 * two_pi_time));
 	}
+	uint8_t* q_u8 = (uint8_t*)data.get();
 	int16_t* q_s16 = (int16_t*)data.get();
+	int32_t* q_s32 = (int32_t*)data.get();
 	float* q_flt = (float*)data.get();
+	double* q_dbl = (double*)data.get();
+	uint8_t a_u8 = 0.3 * MAXUINT8;
+	uint16_t a_s16 = 0.3 * MAXUINT16;
+	uint32_t a_s32 = 0.3 * MAXUINT32;
 	switch (sample_fmt) {
+	case (AV_SAMPLE_FMT_U8):
+		for (int j = 0; j < nb_samples; j++)
+			for (int k = 0; k < channels; k++)
+				*q_u8++ = 128 + (int8_t)(a_u8 * rawdata[j]);
+		break;
+	case (AV_SAMPLE_FMT_U8P):
+		for (int k = 0; k < channels; k++)
+			for (int j = 0; j < nb_samples; j++)
+				*q_u8++ = 128 + (int8_t)(a_u8 * rawdata[j]);
+		break;
 	case (AV_SAMPLE_FMT_S16):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_s16++ = (int)(10000 * rawdata[j]);
+				*q_s16++ = (int16_t)(a_s16 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_S16P):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_s16++ = (int)(10000 * rawdata[j]);
+				*q_s16++ = (int16_t)(a_s16 * rawdata[j]);
+		break;
+	case (AV_SAMPLE_FMT_S32):
+		for (int j = 0; j < nb_samples; j++)
+			for (int k = 0; k < channels; k++)
+				* q_s32++ = (int32_t)(a_s32 * rawdata[j]);
+		break;
+	case (AV_SAMPLE_FMT_S32P):
+		for (int k = 0; k < channels; k++)
+			for (int j = 0; j < nb_samples; j++)
+				* q_s32++ = (int32_t)(a_s32 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_FLT):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_flt++ = (float)(0.3 * rawdata[j]);
+				* q_flt++ = (float)(0.3 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_FLTP):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_flt++ = (float)(0.3 * rawdata[j]);
+				* q_flt++ = (float)(0.3 * rawdata[j]);
+		break;
+	case (AV_SAMPLE_FMT_DBL):
+		for (int j = 0; j < nb_samples; j++)
+			for (int k = 0; k < channels; k++)
+				* q_dbl++ = (double)(0.3 * rawdata[j]);
+		break;
+	case (AV_SAMPLE_FMT_DBLP):
+		for (int k = 0; k < channels; k++)
+			for (int j = 0; j < nb_samples; j++)
+				* q_dbl++ = (double)(0.3 * rawdata[j]);
 		break;
 	default:
 		LOG->error("unsupported sample format");
@@ -154,44 +190,48 @@ void Test(
 	format->Flush();
 	format = nullptr;
 	LOG->info("export finished");
+	LOG->info("exported {} video frames and {} audio frames", vpts, apts);
 	LOG_EXIT;
 }
 
 int main()
 {
-	AVLogSetCallback();
 	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
-	// logger->set_level(spdlog::level::debug);
-	// AVLogSetLevel(spdlog::level::debug);
+	AVLogSetCallback();
+	settings.reset(new Settings);
 	LOG_ENTER;
-	Test(
-		"test-ffv1-yuv444-flac-s16.mkv",
-		AV_CODEC_ID_FFV1, AVRational{ 60000, 1001 }, AV_PIX_FMT_YUV444P,
-		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 48000, AV_CH_LAYOUT_STEREO);
-	Test(
-		"test-ffv1-nv12-flac-s16.mkv",
-		AV_CODEC_ID_FFV1, AVRational{ 30000, 1001 }, AV_PIX_FMT_NV12,
-		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_S16, 48000, AV_CH_LAYOUT_STEREO);
-	Test(
-		"test-ffv1-yuv420-flac-flt.mkv",
-		AV_CODEC_ID_FFV1, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
-		AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 48000, AV_CH_LAYOUT_STEREO);
-	Test(
-		"test-mpeg4-yuv420-aac-flt-48k.mp4",
-		AV_CODEC_ID_MPEG4, AVRational{ 60000, 1001 }, AV_PIX_FMT_YUV420P,
-		AV_CODEC_ID_AAC, AV_SAMPLE_FMT_FLT, 48000, AV_CH_LAYOUT_STEREO);
-	Test(
-		"test-mpeg4-yuv420-aac-flt-22k.mp4",
-		AV_CODEC_ID_MPEG4, AVRational{ 24000, 1001 }, AV_PIX_FMT_YUV420P,
-		AV_CODEC_ID_AAC, AV_SAMPLE_FMT_FLT, 22050, AV_CH_LAYOUT_STEREO);
+	auto frame_rate_numerator{ 30000 };
+	auto frame_rate_denominator{ 1001 };
+	std::string pix_fmt_name{ "yuv420p" };
+	std::string sample_fmt_name{ "s16" };
+	auto sample_rate{ 44100 };
+	auto nb_channels{ 2 };
+	auto testsec = settings->GetSec("test");
+	settings->GetVar(testsec, "frame_rate_numerator", frame_rate_numerator);
+	settings->GetVar(testsec, "frame_rate_denominator", frame_rate_denominator);
+	settings->GetVar(testsec, "pix_fmt", pix_fmt_name);
+	settings->GetVar(testsec, "sample_fmt", sample_fmt_name);
+	settings->GetVar(testsec, "sample_rate", sample_rate);
+	settings->GetVar(testsec, "nb_channels", nb_channels);
+	auto pix_fmt = av_get_pix_fmt(pix_fmt_name.c_str());
+	auto sample_fmt = av_get_sample_fmt(sample_fmt_name.c_str());
+	if (pix_fmt == AV_PIX_FMT_NONE) {
+		LOG->error("test pixel format {} not found, falling back on yuv420p", pix_fmt_name);
+		pix_fmt = AV_PIX_FMT_YUV420P;
+	}
+	if (sample_fmt == AV_SAMPLE_FMT_NONE) {
+		LOG->error("test sample format {} not found, falling back on s16", sample_fmt_name);
+		sample_fmt = AV_SAMPLE_FMT_S16;
+	}
 	try {
 		Test(
-			"test-unsupported-codec-in-container.mp4",
-			AV_CODEC_ID_MPEG4, AVRational{ 30000, 1001 }, AV_PIX_FMT_YUV420P,
-			AV_CODEC_ID_FLAC, AV_SAMPLE_FMT_FLT, 48000, AV_CH_LAYOUT_STEREO);
+			settings->export_filename,
+			settings->video_codec_id, AVRational{ frame_rate_numerator, frame_rate_denominator }, pix_fmt,
+			settings->audio_codec_id, sample_fmt, sample_rate, av_get_default_channel_layout(nb_channels));
 	}
 	catch (std::exception e) {
-		assert(std::string(e.what()).find("failed to write header") == 0);
 	}
+	std::cout << "Press enter...";
+	std::cin.get();
 	LOG_EXIT;
 }

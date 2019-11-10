@@ -3,12 +3,20 @@
 #include "logger.h"
 #include <inipp.h>
 
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
+
 #define SCRIPT_NAME "SimpleVideoExport"
 
 class Settings : public inipp::Ini<char>
 {
 public:
 	static const std::string ini_filename_;
+	std::string export_filename;
+	AVCodecID video_codec_id;
+	AVCodecID audio_codec_id;
+
 	Settings();
 
 	const Section & GetSec(const std::string & sec_name) const;

@@ -48,7 +48,7 @@ VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	}
 	if (context->pix_fmt != pix_fmt) {
 		LOG->info(
-			"codec {} does not support pixel format {} so using {}",
+			"codec {} does not support pixel format {} so transcoding to {}",
 			avcodec_get_name(codec_id),
 			av_get_pix_fmt_name(pix_fmt),
 			av_get_pix_fmt_name(context->pix_fmt));

@@ -131,33 +131,10 @@ STDAPI SinkWriterBeginWriting(
 		os.str("");
 		settings->generate(os);
 		LOG->debug("settings after interpolation:\n{}", os.str());
-		auto exportsec = settings->GetSec("export");
-		std::string preset{ };
-		std::string folder{ };
-		std::string filebase{ };
-		settings->GetVar(exportsec, "preset", preset);
-		settings->GetVar(exportsec, "folder", folder);
-		settings->GetVar(exportsec, "filebase", filebase);
-		auto presetsec = settings->GetSec(preset);
-		std::string container{ };
-		std::string videocodec_name{ };
-		std::string audiocodec_name{ };
-		settings->GetVar(presetsec, "container", container);
-		settings->GetVar(presetsec, "videocodec", videocodec_name);
-		settings->GetVar(presetsec, "audiocodec", audiocodec_name);
-		auto videocodec = avcodec_find_encoder_by_name(videocodec_name.c_str());
-		auto audiocodec = avcodec_find_encoder_by_name(audiocodec_name.c_str());
-		if (!videocodec)
-			LOG->error("video codec {} not supported", videocodec_name);
-		if (!audiocodec)
-			LOG->error("audio codec {} not supported", audiocodec_name);
-		auto videocodec_id = videocodec ? videocodec->id : AV_CODEC_ID_NONE;
-		auto audiocodec_id = audiocodec ? audiocodec->id : AV_CODEC_ID_NONE;
-		std::string filename{ folder + "\\" + filebase + "." + container };
 		format.reset(new Format(
-			filename,
-			videocodec_id, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
-			audiocodec_id, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout));
+			settings->export_filename,
+			settings->video_codec_id, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
+			settings->audio_codec_id, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout));
 	}
 	LOG_EXIT;
 	return hr;

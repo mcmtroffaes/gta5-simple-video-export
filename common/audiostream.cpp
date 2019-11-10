@@ -93,19 +93,19 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	context->sample_fmt = FindBestSampleFmt(context->codec, sample_fmt);
 	if (context->sample_fmt != sample_fmt)
 		LOG->info(
-			"codec {} does not support sample format {} so using {}",
+			"codec {} does not support sample format {} so transcoding to {}",
 			avcodec_get_name(codec_id),
 			av_get_sample_fmt_name(sample_fmt),
 			av_get_sample_fmt_name(context->sample_fmt));
 	context->sample_rate = FindBestSampleRate(context->codec, sample_rate);
 	if (context->sample_rate != sample_rate)
 		LOG->info(
-			"codec {} does not support sample rate {} so using {}",
+			"codec {} does not support sample rate {} so transcoding to {}",
 			avcodec_get_name(codec_id), sample_rate, context->sample_rate);
 	context->channel_layout = FindBestChannelLayout(context->codec, channel_layout);
 	if (context->channel_layout != channel_layout)
 		LOG->info(
-			"codec {} does not support channel layout {} so using {}",
+			"codec {} does not support channel layout {} so transcoding to {}",
 			avcodec_get_name(codec_id),
 			GetChannelLayoutString(channel_layout),
 			GetChannelLayoutString(context->channel_layout));
