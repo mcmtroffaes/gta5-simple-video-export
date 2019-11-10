@@ -92,24 +92,26 @@ AudioInfo::AudioInfo(DWORD stream_index_, IMFMediaType & input_media_type)
 	else {
 		LOG->info("audio num channels = {}", nb_channels);
 		channel_layout = av_get_default_channel_layout(nb_channels);
-		char buf[256];
+		char buf[256]{ 0 };
 		av_get_channel_layout_string(buf, sizeof(buf), nb_channels, channel_layout);
 		LOG->info("audio channel layout = {}", buf);
 		// sanity check
-		if (av_get_channel_layout_nb_channels(channel_layout) != nb_channels) {
+		if (av_get_channel_layout_nb_channels(channel_layout) != nb_channels)
 			LOG->warn("channel layout does not match num channels");
-		}
 	}
 	hr = input_media_type.GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &bits_per_sample);
-	if (SUCCEEDED(hr)) {
+	if (FAILED(hr)) {
+		LOG->error("failed to get audio bits per sample");
+	}
+	else {
 		LOG->info("audio bits per sample = {}", bits_per_sample);
 	}
 	sample_fmt = GetAVSampleFmt(subtype, bits_per_sample);
-	if (sample_fmt != AV_SAMPLE_FMT_NONE) {
-		LOG->info("audio sample format = {}", av_get_sample_fmt_name(sample_fmt));
+	if (sample_fmt == AV_SAMPLE_FMT_NONE) {
+		LOG->error("failed to identify audio sample format");
 	}
 	else {
-		LOG->error("failed to identify audio sample format");
+		LOG->info("audio sample format = {}", av_get_sample_fmt_name(sample_fmt));
 	};
 	LOG_EXIT;
 }
@@ -153,11 +155,11 @@ VideoInfo::VideoInfo(DWORD stream_index_, IMFMediaType & input_media_type)
 		LOG->info("video frame rate = {}/{}", frame_rate_numerator, frame_rate_denominator);
 	}
 	pix_fmt = GetAVPixFmt(subtype);
-	if (pix_fmt != AV_PIX_FMT_NONE) {
-		LOG->info("video pixel format = {}", av_get_pix_fmt_name(pix_fmt));
+	if (pix_fmt == AV_PIX_FMT_NONE) {
+		LOG->error("failed to identify video pixel format");
 	}
 	else {
-		LOG->error("failed to identify video pixel format");
+		LOG->info("video pixel format = {}", av_get_pix_fmt_name(pix_fmt));
 	}
 	LOG_EXIT;
 }
