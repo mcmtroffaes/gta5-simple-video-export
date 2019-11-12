@@ -12,19 +12,13 @@ extern "C" {
 #ifdef _WIN32
 #include <ShlObj.h> // SHGetKnownFolderPath
 
-std::string wstring_to_utf8(const std::wstring& str)
-{
-	std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
-	return myconv.to_bytes(str);
-}
-
-std::string GetKnownFolder(const KNOWNFOLDERID & fldrid)
+auto GetKnownFolder(const KNOWNFOLDERID & fldrid)
 {
 	LOG_ENTER;
 	PWSTR path = NULL;
 	auto hr = SHGetKnownFolderPath(fldrid, 0, NULL, &path);
 	if (SUCCEEDED(hr)) {
-		auto path2 = wstring_to_utf8(std::wstring(path));
+		std::filesystem::path path2{ path };
 		CoTaskMemFree(path);
 		LOG_EXIT;
 		return path2;
@@ -32,7 +26,7 @@ std::string GetKnownFolder(const KNOWNFOLDERID & fldrid)
 	else {
 		LOG->error("failed to get known folder");
 		LOG_EXIT;
-		return std::string();
+		return std::filesystem::path{};
 	}
 }
 #endif
@@ -92,9 +86,9 @@ Settings::Settings()
 	builtinsec["timestamp"] = timestamp;
 	LOG->debug("timestamp = {}", timestamp);
 #ifdef _WIN32
-	auto docs = GetKnownFolder(FOLDERID_Documents);
-	auto vids = GetKnownFolder(FOLDERID_Videos);
-	auto desk = GetKnownFolder(FOLDERID_Desktop);
+	auto docs = GetKnownFolder(FOLDERID_Documents).u8string();
+	auto vids = GetKnownFolder(FOLDERID_Videos).u8string();
+	auto desk = GetKnownFolder(FOLDERID_Desktop).u8string();
 	builtinsec["documentsfolder"] = docs;
 	builtinsec["videosfolder"] = vids;
 	builtinsec["desktopfolder"] = desk;

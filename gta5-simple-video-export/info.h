@@ -10,18 +10,6 @@ VideoInfo stores information about the video format (resolution, framerate,
 and so on). It also stores the handle to the
 media foundation stream index. This information is initialized in the
 SinkWriterSetInputMediaType hook  (search for "video_info.reset").
-
-Uninitialized values are represented by UINT32_MAX for integer
-variables.
-
-Each info class also has an UpdateSettings method, which exports the
-information to the DEFAULT section of the ini file. This happens in the
-SinkWriterBeginWriting hook, just before the ini file is interpolated (search
-for "settings->interpolate").
-
-CreateBatchFile is a function that creates a batch file for converting
-the raw files to a compressed audio/video container file, using the
-batch_command specified by the user in the ini file.
 */
 
 #pragma once
