@@ -89,9 +89,9 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	int32_t* q_s32 = (int32_t*)data.get();
 	float* q_flt = (float*)data.get();
 	double* q_dbl = (double*)data.get();
-	uint8_t a_u8 = 0.3 * 255;
-	uint16_t a_s16 = 0.3 * 65535;
-	uint32_t a_s32 = 0.3 * 4294967295;
+	uint8_t a_u8 = 255 / 3;
+	uint16_t a_s16 = 65535 / 3;
+	uint32_t a_s32 = 4294967295 / 3;
 	switch (sample_fmt) {
 	case (AV_SAMPLE_FMT_U8):
 		for (int j = 0; j < nb_samples; j++)
