@@ -229,7 +229,7 @@ int main()
 			settings->video_codec_id, AVRational{ frame_rate_numerator, frame_rate_denominator }, pix_fmt,
 			settings->audio_codec_id, sample_fmt, sample_rate, av_get_default_channel_layout(nb_channels));
 	}
-	catch (std::exception e) {
+	catch (std::exception& e) {
 	}
 	std::cout << "Press enter...";
 	std::cin.get();

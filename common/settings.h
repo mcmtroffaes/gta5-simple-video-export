@@ -37,8 +37,8 @@ public:
 				LOG->error("failed to parse {}", var->second);
 			}
 		}
-		return found;
 		LOG_EXIT;
+		return found;
 	}
 };
 
