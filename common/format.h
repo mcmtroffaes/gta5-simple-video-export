@@ -14,7 +14,7 @@ public:
 	std::unique_ptr<AudioStream> astream;
 
 	Format(
-		const std::string& filename,
+		const std::filesystem::path& filename,
 		AVCodecID vcodec, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
 		AVCodecID acodec, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout);
 

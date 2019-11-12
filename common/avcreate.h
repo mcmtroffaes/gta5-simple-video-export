@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -28,7 +29,7 @@ using SwrContextPtr = std::unique_ptr<SwrContext, SwrContextDeleter>;
 using SwsContextPtr = std::unique_ptr<SwsContext, SwsContextDeleter>;
 using AVAudioFifoPtr = std::unique_ptr<AVAudioFifo, AVAudioFifoDeleter>;
 
-AVFormatContextPtr CreateAVFormatContext(const std::string& filename);
+AVFormatContextPtr CreateAVFormatContext(const std::filesystem::path& filename);
 AVCodecPtr CreateAVCodec(const AVCodecID& codec_id);
 AVStreamPtr CreateAVStream(AVFormatContext& format_context, const AVCodec& codec);
 AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec);

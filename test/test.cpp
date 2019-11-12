@@ -152,7 +152,7 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 }
 
 void Test(
-	const std::string& filename,
+	const std::filesystem::path& filename,
 	AVCodecID vcodec_id, AVRational frame_rate, AVPixelFormat pix_fmt,
 	AVCodecID acodec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 {

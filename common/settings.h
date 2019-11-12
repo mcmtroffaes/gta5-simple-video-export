@@ -1,6 +1,7 @@
 #pragma once
 
 #include "logger.h"
+#include <filesystem>
 #include <inipp.h>
 
 extern "C" {
@@ -12,8 +13,8 @@ extern "C" {
 class Settings : public inipp::Ini<char>
 {
 public:
-	static const std::string ini_filename_;
-	std::string export_filename;
+	static const std::filesystem::path ini_filename_;
+	std::filesystem::path export_filename;
 	AVCodecID video_codec_id;
 	AVCodecID audio_codec_id;
 

@@ -54,7 +54,7 @@ std::string TimeStamp()
 	return oss.str();
 }
 
-const std::string Settings::ini_filename_ = SCRIPT_NAME ".ini";
+const std::filesystem::path Settings::ini_filename_ = SCRIPT_NAME ".ini";
 
 Settings::Settings()
 	: export_filename{}
@@ -62,10 +62,10 @@ Settings::Settings()
 	, audio_codec_id{ AV_CODEC_ID_NONE }
 {
 	// LOG_ENTER is deferred until the log level is set
-	LOG->debug("parsing {}", ini_filename_);
+	LOG->debug("parsing {}", ini_filename_.u8string());
 	std::ifstream is(ini_filename_);
 	if (is.fail()) {
-		LOG->error("failed to open \"{}\"", ini_filename_);
+		LOG->error("failed to open \"{}\"", ini_filename_.u8string());
 	}
 	else {
 		parse(is);
@@ -115,12 +115,14 @@ Settings::Settings()
 	auto presetsec = GetSec(preset);
 	std::string container{ "mp4" };
 	GetVar(presetsec, "container", container);
-	export_filename = folder + "\\" + basename + "." + container;
-	auto oformat = av_guess_format(nullptr, export_filename.c_str(), nullptr);
+	export_filename = folder;
+	export_filename /= basename + "." + container;
+	auto oformat = av_guess_format(nullptr, export_filename.u8string().c_str(), nullptr);
 	if (!oformat) {
 		LOG->error("container format {} not supported, falling back to mp4", container);
-		export_filename = folder + "\\" + basename + ".mp4";
-		oformat = av_guess_format(nullptr, export_filename.c_str(), nullptr);
+		export_filename = folder;
+		export_filename /= basename + ".mp4";
+		oformat = av_guess_format(nullptr, export_filename.u8string().c_str(), nullptr);
 		if (!oformat)
 			LOG_THROW(std::runtime_error, "mp4 output format not supported");
 	}

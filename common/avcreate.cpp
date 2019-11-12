@@ -1,14 +1,14 @@
 #include "avcreate.h"
 #include "logger.h"
 
-AVFormatContextPtr CreateAVFormatContext(const std::string& filename) {
+AVFormatContextPtr CreateAVFormatContext(const std::filesystem::path& filename) {
 	LOG_ENTER;
 	AVFormatContext* context{ nullptr };
-	int ret{ avformat_alloc_output_context2(&context, NULL, NULL, filename.c_str()) };
+	int ret{ avformat_alloc_output_context2(&context, NULL, NULL, filename.u8string().c_str()) };
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}': {}", filename, AVErrorString(ret)));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}': {}", filename.u8string(), AVErrorString(ret)));
 	if (!context)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}'", filename));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}'", filename.u8string()));
 	LOG_EXIT;
 	return AVFormatContextPtr{ context };
 }
