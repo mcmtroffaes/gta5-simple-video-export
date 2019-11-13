@@ -234,8 +234,8 @@ STDAPI CreateSinkWriterFromURL(
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings.reset(new Settings);
 	auto enable = true;
-	auto defsec = settings->GetSec("builtin");
-	settings->GetVar(defsec, "enable", enable);
+	auto exportsec = settings->GetSec("export");
+	settings->GetVar(exportsec, "enable", enable);
 	if (!enable) {
 		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();
