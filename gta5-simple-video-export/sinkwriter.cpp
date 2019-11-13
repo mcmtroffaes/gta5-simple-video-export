@@ -29,6 +29,8 @@ unhook all the SinkWriter hooks (this will also close all files).
 #include "info.h"
 #include "format.h"
 
+#include <mutex>
+
 #include <wrl/client.h> // ComPtr
 
 #include <mfapi.h>
@@ -47,6 +49,7 @@ std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
 std::unique_ptr<Format> format = nullptr;
+std::mutex transcode_mutex;
 
 void UnhookVFuncDetours()
 {
@@ -159,14 +162,20 @@ STDAPI SinkWriterWriteSample(
 					buffer_length, bytes_per_sample, nb_channels);
 			auto frame = CreateAudioFrame(
 				audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout, nb_samples, p_buffer);
-			format->astream->Transcode(frame);
+			{
+				std::lock_guard<std::mutex> lock(transcode_mutex);
+				format->astream->Transcode(frame);
+			}
 		}
 		if (video_info && dwStreamIndex == video_info->stream_index) {
 			LOG->debug("transcoding {} bytes to video stream", buffer_length);
 			// TODO check buffer length
 			auto frame = CreateVideoFrame(
 				video_info->width, video_info->height, video_info->pix_fmt, p_buffer);
-			format->vstream->Transcode(frame);
+			{
+				std::lock_guard<std::mutex> lock(transcode_mutex);
+				format->vstream->Transcode(frame);
+			}
 		}
 		memset(p_buffer, 0, buffer_length); // clear sample so game will output blank video/audio
 		hr = p_media_buffer->Unlock();
