@@ -123,19 +123,11 @@ STDAPI SinkWriterBeginWriting(
 	LOG->trace("IMFSinkWriter::BeginWriting: enter");
 	auto hr = original_func(pThis);
 	LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
-	if (settings && audio_info && video_info) {
-		std::ostringstream os;
-		settings->generate(os);
-		LOG->debug("settings before interpolation:\n{}", os.str());
-		settings->interpolate();
-		os.str("");
-		settings->generate(os);
-		LOG->debug("settings after interpolation:\n{}", os.str());
+	if (settings && audio_info && video_info)
 		format.reset(new Format(
 			settings->export_filename,
 			settings->video_codec_id, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
 			settings->audio_codec_id, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout));
-	}
 	LOG_EXIT;
 	return hr;
 }
