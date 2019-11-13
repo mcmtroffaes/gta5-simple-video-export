@@ -190,6 +190,7 @@ STDAPI SinkWriterFinalize(
 	LOG_ENTER;
 	LOG->info("flushing transcoder");
 	format->Flush();
+	format = nullptr;
 	if (!finalize_hook) {
 		LOG->error("IMFSinkWriter::Finalize hook not set up");
 		return E_FAIL;
