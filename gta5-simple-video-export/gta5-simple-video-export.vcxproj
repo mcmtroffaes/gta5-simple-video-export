@@ -29,6 +29,7 @@
     <ClInclude Include="sinkwriter.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="cpp.hint" />
     <None Include="packages.config" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

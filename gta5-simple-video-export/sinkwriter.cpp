@@ -42,6 +42,10 @@ unhook all the SinkWriter hooks (this will also close all files).
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
 
+extern "C" {
+#include <libavutil/pixdesc.h>
+}
+
 using namespace Microsoft::WRL;
 
 std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
@@ -160,22 +164,28 @@ STDAPI SinkWriterWriteSample(
 			int bytes_per_sample = av_get_bytes_per_sample(audio_info->sample_fmt);
 			int nb_channels = av_get_channel_layout_nb_channels(audio_info->channel_layout);
 			int nb_samples = buffer_length / (bytes_per_sample * nb_channels);
-			if (buffer_length != nb_samples * bytes_per_sample * nb_channels)
-				LOG->warn("buffer length {} not a multiple of bytes per sample {} and number of channels {}",
+			if (buffer_length != nb_samples * bytes_per_sample * nb_channels) {
+				LOG->error("buffer length {} not a multiple of bytes per sample {} and number of channels {}",
 					buffer_length, bytes_per_sample, nb_channels);
-			auto frame = CreateAudioFrame(
-				audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout, nb_samples, p_buffer);
-			{
+			}
+			else {
+				auto frame = CreateAudioFrame(
+					audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout, nb_samples, p_buffer);
 				std::lock_guard<std::mutex> lock(transcode_mutex);
 				format->astream->Transcode(frame);
 			}
 		}
 		if (video_info && dwStreamIndex == video_info->stream_index) {
 			LOG->debug("transcoding {} bytes to video stream", buffer_length);
-			// TODO check buffer length
-			auto frame = CreateVideoFrame(
-				video_info->width, video_info->height, video_info->pix_fmt, p_buffer);
-			{
+			auto pix_desc = av_pix_fmt_desc_get(video_info->pix_fmt);
+			auto bits_per_pixel = av_get_padded_bits_per_pixel(pix_desc);
+			if (buffer_length * 8 != video_info->width * video_info->height * bits_per_pixel) {
+				LOG->error("buffer length {} does not match video frame of size {}x{} at {} bits per pixel",
+					buffer_length, video_info->width, video_info->height, bits_per_pixel);
+			}
+			else {
+				auto frame = CreateVideoFrame(
+					video_info->width, video_info->height, video_info->pix_fmt, p_buffer);
 				std::lock_guard<std::mutex> lock(transcode_mutex);
 				format->vstream->Transcode(frame);
 			}
