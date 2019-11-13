@@ -16,7 +16,10 @@ interpolate the ini file, we create the file handles that will contain the
 raw exported audio and video, and we create the batch file for post-processing.
 
 Next, the game will repeatedly call SinkWriterWriteSample. We intercept the
-raw data and write it to our own file handles.
+raw data and transcode it ourselves. Note that SinkWriterWriteSample is
+called from different threads for audio and for video, so we must ensure
+that all transcode calls are thread safe. This is the purpose of
+transcode_mutex.
 
 At the end of the export process, the game calls SinkWriterFinalize. There we
 unhook all the SinkWriter hooks (this will also close all files).
