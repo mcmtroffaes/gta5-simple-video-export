@@ -31,7 +31,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		/* set up logger */
 		logger = spdlog::rotating_logger_mt(
 			SCRIPT_NAME, SCRIPT_NAME ".log", 10000000, 5);
-		logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%t] [%l] %v");
+		logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%t] [%^%l%$] %v");
 		AVLogSetCallback();
 		/* load settings */
 		settings.reset(new Settings);

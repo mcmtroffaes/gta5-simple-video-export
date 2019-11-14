@@ -198,7 +198,7 @@ void Test(
 int main()
 {
 	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
-	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%t] [%l] %v");
+	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%t] [%^%l%$] %v");
 	AVLogSetCallback();
 	settings = std::make_unique<Settings>();
 	LOG_ENTER;
