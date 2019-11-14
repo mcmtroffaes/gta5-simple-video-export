@@ -6,7 +6,7 @@
 template <class FuncType>
 std::unique_ptr<PLH::IATHook> CreateIATHook(const char *library_name, const char *func_name, FuncType new_func) {
 	LOG_ENTER;
-	std::unique_ptr<PLH::IATHook> hook(new PLH::IATHook());
+	auto hook{ std::make_unique<PLH::IATHook>() };
 	logger->debug("setting up hook for {}", func_name);
 	hook->SetupHook(library_name, func_name, (BYTE*)new_func);
 	if (!hook->Hook()) {
@@ -20,7 +20,7 @@ std::unique_ptr<PLH::IATHook> CreateIATHook(const char *library_name, const char
 template <class ClassType, class FuncType>
 std::unique_ptr<PLH::VFuncDetour> CreateVFuncDetour(ClassType *p_instance, int vfunc_index, FuncType new_func) {
 	LOG_ENTER;
-	std::unique_ptr<PLH::VFuncDetour> hook(new PLH::VFuncDetour());
+	auto hook{ std::make_unique<PLH::VFuncDetour>() };
 	logger->debug("setting up hook for {} at virtual function index {}", typeid(ClassType).name(), vfunc_index);
 	if (!p_instance) {
 		hook = nullptr;

@@ -108,10 +108,10 @@ STDAPI SinkWriterSetInputMediaType(
 			LOG->error("failed to get major type for stream at index {}", dwStreamIndex);
 		}
 		else if (major_type == MFMediaType_Audio) {
-			audio_info.reset(new AudioInfo(dwStreamIndex, *pInputMediaType));
+			audio_info = std::make_unique<AudioInfo>(dwStreamIndex, *pInputMediaType);
 		}
 		else if (major_type == MFMediaType_Video) {
-			video_info.reset(new VideoInfo(dwStreamIndex, *pInputMediaType));
+			video_info = std::make_unique<VideoInfo>(dwStreamIndex, *pInputMediaType);
 		}
 		else {
 			LOG->debug("unknown stream at index {}", dwStreamIndex);
@@ -134,10 +134,10 @@ STDAPI SinkWriterBeginWriting(
 	auto hr = original_func(pThis);
 	LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
 	if (settings && audio_info && video_info)
-		format.reset(new Format(
+		format = std::make_unique<Format>(
 			settings->export_filename,
 			settings->video_codec_id, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
-			settings->audio_codec_id, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout));
+			settings->audio_codec_id, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
 	LOG_EXIT;
 	return hr;
 }
@@ -247,7 +247,7 @@ STDAPI CreateSinkWriterFromURL(
 	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
 	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
 	// reload settings to see if the mod is enabled, and to get the latest settings
-	settings.reset(new Settings);
+	settings = std::make_unique<Settings>();
 	auto enable = true;
 	auto exportsec = settings->GetSec("export");
 	settings->GetVar(exportsec, "enable", enable);

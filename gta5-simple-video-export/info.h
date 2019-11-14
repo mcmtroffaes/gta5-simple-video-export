@@ -4,12 +4,12 @@ Classes to store information about the export.
 AudioInfo stores information about the audio format (bit rate, number of
 channels, and so on). It also stores the
 media foundation stream index. This information is initialized in the
-SinkWriterSetInputMediaType hook  (search for "audio_info.reset").
+SinkWriterSetInputMediaType hook (search for "std::make_unique<AudioInfo>").
 
 VideoInfo stores information about the video format (resolution, framerate,
 and so on). It also stores the handle to the
 media foundation stream index. This information is initialized in the
-SinkWriterSetInputMediaType hook  (search for "video_info.reset").
+SinkWriterSetInputMediaType hook (search for "std::make_unique<VideoInfo>").
 */
 
 #pragma once

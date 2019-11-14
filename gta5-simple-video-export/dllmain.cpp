@@ -34,7 +34,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%t] [%^%l%$] %v");
 		AVLogSetCallback();
 		/* load settings */
-		settings.reset(new Settings);
+		settings = std::make_unique<Settings>();
 		LOG_ENTER;
 		/* set up hooks */
 		Hook();
