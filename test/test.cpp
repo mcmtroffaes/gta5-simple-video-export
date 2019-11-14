@@ -90,59 +90,59 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	auto* q_s32 = reinterpret_cast<int32_t*>(data.get());
 	auto* q_flt = reinterpret_cast<float*>(data.get());
 	auto* q_dbl = reinterpret_cast<double*>(data.get());
-	uint8_t a_u8 = 85; // 255 / 3;
+	int8_t a_s8 = 85; // 255 / 3;
 	int16_t a_s16 = 21845; // 65535 / 3;
 	int32_t a_s32 = 1431655765; // 4294967295 / 3;
 	switch (sample_fmt) {
 	case (AV_SAMPLE_FMT_U8):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_u8++ = 128 + (int8_t)(a_u8 * rawdata[j]);
+				*q_u8++ = static_cast<uint8_t>(128 + a_s8 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_U8P):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_u8++ = 128 + (int8_t)(a_u8 * rawdata[j]);
+				*q_u8++ = static_cast<uint8_t>(128 + a_s8 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_S16):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_s16++ = (int16_t)(a_s16 * rawdata[j]);
+				*q_s16++ = static_cast<int16_t>(a_s16 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_S16P):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_s16++ = (int16_t)(a_s16 * rawdata[j]);
+				*q_s16++ = static_cast<int16_t>(a_s16 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_S32):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_s32++ = (int32_t)(a_s32 * rawdata[j]);
+				*q_s32++ = static_cast<int32_t>(a_s32 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_S32P):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_s32++ = (int32_t)(a_s32 * rawdata[j]);
+				*q_s32++ = static_cast<int32_t>(a_s32 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_FLT):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_flt++ = (float)(0.3 * rawdata[j]);
+				*q_flt++ = static_cast<float>(0.3 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_FLTP):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_flt++ = (float)(0.3 * rawdata[j]);
+				*q_flt++ = static_cast<float>(0.3 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_DBL):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				*q_dbl++ = (double)(0.3 * rawdata[j]);
+				*q_dbl++ = 0.3 * rawdata[j];
 		break;
 	case (AV_SAMPLE_FMT_DBLP):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				*q_dbl++ = (double)(0.3 * rawdata[j]);
+				*q_dbl++ = 0.3 * rawdata[j];
 		break;
 	default:
 		LOG->error("unsupported sample format");
