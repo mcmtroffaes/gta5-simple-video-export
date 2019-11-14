@@ -140,14 +140,14 @@ void AudioStream::Transcode(const AVFramePtr& src_frame)
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("resampling error: {}", AVErrorString(ret)));
 	// save buffer frame to fifo buffer
-	int nb_written = av_audio_fifo_write(fifo.get(), (void**) buf_frame->data, buf_frame->nb_samples);
+	int nb_written = av_audio_fifo_write(fifo.get(), reinterpret_cast<void**>(buf_frame->data), buf_frame->nb_samples);
 	if (nb_written < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to write to audio buffer: {}", AVErrorString(nb_written)));
 	if (nb_written != buf_frame->nb_samples)
 		LOG->warn("expected {} samples to be written to audio buffer but wrote {}", buf_frame->nb_samples, nb_written);
 	// read from fifo buffer in chunks of dst_frame->nb_samples, until no further chunks can be read
 	while (av_audio_fifo_size(fifo.get()) >= dst_frame->nb_samples) {
-		int nb_read = av_audio_fifo_read(fifo.get(), (void**)dst_frame->data, dst_frame->nb_samples);
+		int nb_read = av_audio_fifo_read(fifo.get(), reinterpret_cast<void**>(dst_frame->data), dst_frame->nb_samples);
 		if (nb_read < 0)
 			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
 		if (nb_read != dst_frame->nb_samples)
@@ -157,7 +157,7 @@ void AudioStream::Transcode(const AVFramePtr& src_frame)
 	}
 	// flush buffer if needed
 	if (!src_frame) {
-		int nb_read = av_audio_fifo_read(fifo.get(), (void**)dst_frame->data, dst_frame->nb_samples);
+		int nb_read = av_audio_fifo_read(fifo.get(), reinterpret_cast<void**>(dst_frame->data), dst_frame->nb_samples);
 		if (nb_read < 0)
 			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
 		dst_frame->nb_samples = nb_read;

@@ -1,26 +1,27 @@
 #include <codecvt>
 #include <iostream>
+#include <memory>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/timestamp.h>
-#include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
+#include <libswscale/swscale.h>
 }
 
-#include "settings.h"
 #include "format.h"
+#include "settings.h"
 
 #pragma comment(lib, "common.lib")
 
 std::shared_ptr<spdlog::logger> logger = nullptr;
 std::unique_ptr<Settings> settings = nullptr;
 
-#define DATAY(S, X, Y, T) (uint8_t)(S * X + S * Y + T * 30)
-#define DATAU(S, X, Y, T) (uint8_t)(128 + S * Y + T * 20)
-#define DATAV(S, X, Y, T) (uint8_t)(64 + S * X + T * 50)
+#define DATAY(S, X, Y, T) (uint8_t)((S) * (X) + (S) * (Y) + (T) * 30)
+#define DATAU(S, X, Y, T) (uint8_t)(128 + (S) * (Y) + (T) * 20)
+#define DATAV(S, X, Y, T) (uint8_t)(64 + (S) * (X) + (T) * 50)
 
 auto MakeVideoData(size_t width, size_t height, AVPixelFormat pix_fmt, double t) {
 	LOG_ENTER;
@@ -84,14 +85,14 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 		auto two_pi_time = (2.0 * M_PI * (pts + j)) / sample_rate;
 		rawdata[j] = sin(freq1 * two_pi_time + delta * sin(freq2 * two_pi_time) * sin(freq3 * two_pi_time));
 	}
-	uint8_t* q_u8 = (uint8_t*)data.get();
-	int16_t* q_s16 = (int16_t*)data.get();
-	int32_t* q_s32 = (int32_t*)data.get();
-	float* q_flt = (float*)data.get();
-	double* q_dbl = (double*)data.get();
-	uint8_t a_u8 = 255 / 3;
-	uint16_t a_s16 = 65535 / 3;
-	uint32_t a_s32 = 4294967295 / 3;
+	auto* q_u8 = data.get();
+	auto* q_s16 = reinterpret_cast<int16_t*>(data.get());
+	auto* q_s32 = reinterpret_cast<int32_t*>(data.get());
+	auto* q_flt = reinterpret_cast<float*>(data.get());
+	auto* q_dbl = reinterpret_cast<double*>(data.get());
+	uint8_t a_u8 = 85; // 255 / 3;
+	int16_t a_s16 = 21845; // 65535 / 3;
+	int32_t a_s32 = 1431655765; // 4294967295 / 3;
 	switch (sample_fmt) {
 	case (AV_SAMPLE_FMT_U8):
 		for (int j = 0; j < nb_samples; j++)
@@ -116,32 +117,32 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	case (AV_SAMPLE_FMT_S32):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				* q_s32++ = (int32_t)(a_s32 * rawdata[j]);
+				*q_s32++ = (int32_t)(a_s32 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_S32P):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				* q_s32++ = (int32_t)(a_s32 * rawdata[j]);
+				*q_s32++ = (int32_t)(a_s32 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_FLT):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				* q_flt++ = (float)(0.3 * rawdata[j]);
+				*q_flt++ = (float)(0.3 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_FLTP):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				* q_flt++ = (float)(0.3 * rawdata[j]);
+				*q_flt++ = (float)(0.3 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_DBL):
 		for (int j = 0; j < nb_samples; j++)
 			for (int k = 0; k < channels; k++)
-				* q_dbl++ = (double)(0.3 * rawdata[j]);
+				*q_dbl++ = (double)(0.3 * rawdata[j]);
 		break;
 	case (AV_SAMPLE_FMT_DBLP):
 		for (int k = 0; k < channels; k++)
 			for (int j = 0; j < nb_samples; j++)
-				* q_dbl++ = (double)(0.3 * rawdata[j]);
+				*q_dbl++ = (double)(0.3 * rawdata[j]);
 		break;
 	default:
 		LOG->error("unsupported sample format");
@@ -160,10 +161,10 @@ void Test(
 	auto width = 416;
 	auto height = 234;
 	std::unique_ptr<Format> format{ nullptr };
-	format.reset(new Format(
+	format = std::make_unique<Format>(
 		filename,
 		vcodec_id, width, height, frame_rate, pix_fmt,
-		acodec_id, sample_fmt, sample_rate, channel_layout));
+		acodec_id, sample_fmt, sample_rate, channel_layout);
 	const auto atb = AVRational{ 1, sample_rate };
 	const auto vtb = av_inv_q(frame_rate);
 	int apts = 0;
@@ -197,8 +198,9 @@ void Test(
 int main()
 {
 	logger = spdlog::stdout_color_mt(SCRIPT_NAME);
+	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%t] [%l] %v");
 	AVLogSetCallback();
-	settings.reset(new Settings);
+	settings = std::make_unique<Settings>();
 	LOG_ENTER;
 	auto frame_rate_numerator{ 30000 };
 	auto frame_rate_denominator{ 1001 };

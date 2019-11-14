@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <memory>
-#include <string>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -16,8 +15,8 @@ struct AVFormatContextDeleter { void operator()(AVFormatContext* context) const;
 struct AVStreamDeleter { void operator()(AVStream* stream) const; };
 struct AVCodecContextDeleter { void operator()(AVCodecContext* context) const; };
 struct AVFrameDeleter { void operator()(AVFrame* frame) const; };
-struct SwrContextDeleter { void operator()(SwrContext* context) const; };
-struct SwsContextDeleter { void operator()(SwsContext* context) const; };
+struct SwrContextDeleter { void operator()(SwrContext* swr) const; };
+struct SwsContextDeleter { void operator()(SwsContext* sws) const; };
 struct AVAudioFifoDeleter { void operator()(AVAudioFifo* fifo) const; };
 
 using AVFormatContextPtr = std::unique_ptr<AVFormatContext, AVFormatContextDeleter>;

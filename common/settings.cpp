@@ -35,7 +35,7 @@ std::string TimeStamp()
 {
 	LOG_ENTER;
 	time_t rawtime;
-	struct tm timeinfo;
+	struct tm timeinfo{};
 	time(&rawtime);
 #ifdef _WIN32
 	localtime_s(&timeinfo, &rawtime);
@@ -51,8 +51,7 @@ std::string TimeStamp()
 const std::filesystem::path Settings::ini_filename_ = SCRIPT_NAME ".ini";
 
 Settings::Settings()
-	: export_filename{}
-	, video_codec_id{ AV_CODEC_ID_NONE }
+	: video_codec_id{ AV_CODEC_ID_NONE }
 	, audio_codec_id{ AV_CODEC_ID_NONE }
 {
 	// LOG_ENTER is deferred until the log level is set
@@ -64,7 +63,7 @@ Settings::Settings()
 	else {
 		parse(is);
 		if (!errors.empty()) {
-			for (auto error : errors) {
+			for (const auto& error : errors) {
 				LOG->error("failed to parse \"{}\"", error);
 			}
 		}
@@ -148,13 +147,11 @@ const Settings::Section empty_section{};
 const Settings::Section & Settings::GetSec(const std::string & sec_name) const {
 	LOG_ENTER;
 	auto sec = sections.find(sec_name);
-	if (sec != sections.end()) {
-		LOG_EXIT;
-		return sec->second;
-	}
-	else {
+	if (sec == sections.end()) {
 		LOG->error("section [{}] not found", sec_name);
 		LOG_EXIT;
 		return empty_section;
 	}
+	LOG_EXIT;
+	return sec->second;
 }
