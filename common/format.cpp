@@ -6,13 +6,15 @@ Format::Format(const std::filesystem::path& filename, AVCodecID vcodec, int widt
 	, astream{ std::make_unique<AudioStream>(context, acodec, sample_fmt, sample_rate, channel_layout) }
 {
 	LOG_ENTER;
-	av_dump_format(context.get(), 0, filename.u8string().c_str(), 1);
+	// the ffmpeg API expects a utf8 encoded const char * for the filename
+	auto c_filename{ reinterpret_cast<const char*>(filename.u8string().c_str()) };
+	av_dump_format(context.get(), 0, c_filename, 1);
 	// none of the above functions should set context to null, but just in case...
 	if (!context)
 		LOG_THROW(std::runtime_error, fmt::format("output context lost"));
-	int ret = avio_open(&context->pb, filename.u8string().c_str(), AVIO_FLAG_WRITE);
+	int ret = avio_open(&context->pb, c_filename, AVIO_FLAG_WRITE);
 	if (ret < 0 || !context->pb)
-		LOG_THROW(std::runtime_error, fmt::format("failed to open '{}' for writing: {}", filename.u8string(), AVErrorString(ret)));
+		LOG_THROW(std::runtime_error, fmt::format("failed to open '{}' for writing: {}", filename.string(), AVErrorString(ret)));
 	if (!(context->oformat->flags & AVFMT_NOFILE)) {
 		ret = avformat_write_header(context.get(), NULL);
 		if (ret < 0)
