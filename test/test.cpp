@@ -90,9 +90,9 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 	auto* q_s32 = reinterpret_cast<int32_t*>(data.get());
 	auto* q_flt = reinterpret_cast<float*>(data.get());
 	auto* q_dbl = reinterpret_cast<double*>(data.get());
-	int8_t a_s8 = 85; // 255 / 3;
-	int16_t a_s16 = 21845; // 65535 / 3;
-	int32_t a_s32 = 1431655765; // 4294967295 / 3;
+	const int8_t a_s8 = 85; // 255 / 3;
+	const int16_t a_s16 = 21845; // 65535 / 3;
+	const int32_t a_s32 = 1431655765; // 4294967295 / 3;
 	switch (sample_fmt) {
 	case (AV_SAMPLE_FMT_U8):
 		for (int j = 0; j < nb_samples; j++)
