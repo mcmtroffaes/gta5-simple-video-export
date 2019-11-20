@@ -18,6 +18,7 @@ struct AVFrameDeleter { void operator()(AVFrame* frame) const; };
 struct SwrContextDeleter { void operator()(SwrContext* swr) const; };
 struct SwsContextDeleter { void operator()(SwsContext* sws) const; };
 struct AVAudioFifoDeleter { void operator()(AVAudioFifo* fifo) const; };
+struct AVDictionaryDeleter{ void operator()(AVDictionary * dict) const; };
 
 using AVFormatContextPtr = std::unique_ptr<AVFormatContext, AVFormatContextDeleter>;
 using AVCodecPtr = const AVCodec*;
@@ -27,6 +28,7 @@ using AVFramePtr = std::unique_ptr<AVFrame, AVFrameDeleter>;
 using SwrContextPtr = std::unique_ptr<SwrContext, SwrContextDeleter>;
 using SwsContextPtr = std::unique_ptr<SwsContext, SwsContextDeleter>;
 using AVAudioFifoPtr = std::unique_ptr<AVAudioFifo, AVAudioFifoDeleter>;
+using AVDictionaryPtr = std::unique_ptr<AVDictionary, AVDictionaryDeleter>;
 
 AVFormatContextPtr CreateAVFormatContext(const std::filesystem::path& filename);
 AVCodecPtr CreateAVCodec(const AVCodecID& codec_id);
@@ -41,3 +43,4 @@ SwsContextPtr CreateSwsContext(
 	int dstW, int dstH, AVPixelFormat dstFormat,
 	int flags);
 AVAudioFifoPtr CreateAVAudioFifo(AVSampleFormat sample_fmt, int channels, int nb_samples);
+AVDictionaryPtr CreateAVDictionary(const std::string& options, const std::string& key_val_sep, const std::string& pairs_sep);

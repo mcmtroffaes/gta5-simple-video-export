@@ -48,6 +48,24 @@ std::string TimeStamp()
 	return oss.str();
 }
 
+void ParseCodecNameOptions(const std::string& value, std::string& name, AVDictionaryPtr& options) {
+	LOG_ENTER;
+	auto pos = value.find_first_of(' ');
+	if (pos == std::string::npos) {
+		name = value;
+		options = nullptr;
+		LOG->debug("codec name is {}", name);
+	}
+	else {
+		name = value.substr(0, pos);
+		std::string options_string{ value.substr(pos + 1) };
+		options = CreateAVDictionary(options_string, ":", ",");
+		LOG->debug("codec name is {}", name);
+		LOG->debug("codec options are {}", options_string);
+	}
+	LOG_EXIT;
+}
+
 const std::filesystem::path Settings::ini_filename_ = SCRIPT_NAME ".ini";
 
 Settings::Settings()
@@ -106,22 +124,24 @@ Settings::Settings()
 	GetVar(exportsec, "basename", basename);
 	GetVar(exportsec, "preset", preset);
 	auto presetsec = GetSec(preset);
-	std::string container{ "mp4" };
+	std::string container{ "mkv" };
 	GetVar(presetsec, "container", container);
 	export_filename = folder;
 	export_filename /= basename + "." + container;
 	auto oformat = av_guess_format(nullptr, export_filename.u8string().c_str(), nullptr);
 	if (!oformat) {
-		LOG->error("container format {} not supported, falling back to mp4", container);
+		LOG->error("container format {} not supported, falling back to mkv", container);
 		export_filename = folder;
-		export_filename /= basename + ".mp4";
+		export_filename /= basename + ".mkv";
 		oformat = av_guess_format(nullptr, export_filename.u8string().c_str(), nullptr);
 		if (!oformat)
-			LOG_THROW(std::runtime_error, "mp4 output format not supported");
+			LOG_THROW(std::runtime_error, "mkv output format not supported");
 	}
 	// set up valid video codec
+	std::string videocodec_value{ };
 	std::string videocodec_name{ };
-	GetVar(presetsec, "videocodec", videocodec_name);
+	GetVar(presetsec, "videocodec", videocodec_value);
+	ParseCodecNameOptions(videocodec_value, videocodec_name, video_codec_options);
 	auto videocodec = avcodec_find_encoder_by_name(videocodec_name.c_str());
 	auto videocodec_fallback = oformat->video_codec;
 	if (!videocodec)
@@ -130,8 +150,10 @@ Settings::Settings()
 			videocodec_name, avcodec_get_name(videocodec_fallback));
 	video_codec_id = videocodec ? videocodec->id : videocodec_fallback;
 	// set up valid audio codec
+	std::string audiocodec_value{ };
 	std::string audiocodec_name{ };
-	GetVar(presetsec, "audiocodec", audiocodec_name);
+	GetVar(presetsec, "audiocodec", audiocodec_value);
+	ParseCodecNameOptions(audiocodec_value, audiocodec_name, audio_codec_options);
 	auto audiocodec = avcodec_find_encoder_by_name(audiocodec_name.c_str());
 	auto audiocodec_fallback = oformat->audio_codec;
 	if (!audiocodec)

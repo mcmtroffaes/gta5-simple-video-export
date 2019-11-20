@@ -136,8 +136,8 @@ STDAPI SinkWriterBeginWriting(
 	if (settings && audio_info && video_info)
 		format = std::make_unique<Format>(
 			settings->export_filename,
-			settings->video_codec_id, nullptr, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
-			settings->audio_codec_id, nullptr, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
+			settings->video_codec_id, settings->video_codec_options, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
+			settings->audio_codec_id, settings->audio_codec_options, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
 	LOG_EXIT;
 	return hr;
 }

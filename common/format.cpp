@@ -2,8 +2,8 @@
 
 Format::Format(
 	const std::filesystem::path& filename,
-	AVCodecID vcodec, AVDictionary** voptions, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
-	AVCodecID acodec, AVDictionary** aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+	AVCodecID vcodec, const AVDictionaryPtr& voptions, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
+	AVCodecID acodec, const AVDictionaryPtr& aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 	: context{ CreateAVFormatContext(filename) }
 	, vstream{ std::make_unique<VideoStream>(context, vcodec, voptions, width, height, frame_rate, pix_fmt) }
 	, astream{ std::make_unique<AudioStream>(context, acodec, aoptions, sample_fmt, sample_rate, channel_layout) }

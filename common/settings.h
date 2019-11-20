@@ -1,5 +1,6 @@
 #pragma once
 
+#include "avcreate.h"
 #include "logger.h"
 #include <filesystem>
 #include <inipp.h>
@@ -16,7 +17,9 @@ public:
 	static const std::filesystem::path ini_filename_;
 	std::filesystem::path export_filename;
 	AVCodecID video_codec_id;
+	AVDictionaryPtr video_codec_options;
 	AVCodecID audio_codec_id;
+	AVDictionaryPtr audio_codec_options;
 
 	Settings();
 

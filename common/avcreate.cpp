@@ -130,3 +130,21 @@ void AVAudioFifoDeleter::operator()(AVAudioFifo* fifo) const {
 	av_audio_fifo_free(fifo);
 	LOG_EXIT;
 }
+
+AVDictionaryPtr CreateAVDictionary(const std::string& options, const std::string& key_val_sep, const std::string& pairs_sep)
+{
+	LOG_ENTER;
+	AVDictionary* dict{};
+	auto ret = av_dict_parse_string(&dict, options.c_str(), key_val_sep.c_str(), pairs_sep.c_str(), 0);
+	if (ret < 0)
+		LOG->error("failed to parse dictionary {}", options);
+	LOG_EXIT;
+	return AVDictionaryPtr{ dict };
+}
+
+void AVDictionaryDeleter::operator()(AVDictionary* dict) const
+{
+	LOG_ENTER;
+	av_dict_free(&dict);
+	LOG_EXIT;
+}

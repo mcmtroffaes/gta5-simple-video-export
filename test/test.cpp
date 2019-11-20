@@ -154,8 +154,8 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 
 void Test(
 	const std::filesystem::path& filename,
-	AVCodecID vcodec_id, AVRational frame_rate, AVPixelFormat pix_fmt,
-	AVCodecID acodec_id, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+	AVCodecID vcodec_id, const AVDictionaryPtr& voptions, AVRational frame_rate, AVPixelFormat pix_fmt,
+	AVCodecID acodec_id, const AVDictionaryPtr& aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 {
 	LOG->info("export started");
 	auto width = 416;
@@ -163,8 +163,8 @@ void Test(
 	std::unique_ptr<Format> format{ nullptr };
 	format = std::make_unique<Format>(
 		filename,
-		vcodec_id, nullptr, width, height, frame_rate, pix_fmt,
-		acodec_id, nullptr, sample_fmt, sample_rate, channel_layout);
+		vcodec_id, voptions, width, height, frame_rate, pix_fmt,
+		acodec_id, aoptions, sample_fmt, sample_rate, channel_layout);
 	const auto atb = AVRational{ 1, sample_rate };
 	const auto vtb = av_inv_q(frame_rate);
 	int apts = 0;
@@ -228,8 +228,8 @@ int main()
 	try {
 		Test(
 			settings->export_filename,
-			settings->video_codec_id, AVRational{ frame_rate_numerator, frame_rate_denominator }, pix_fmt,
-			settings->audio_codec_id, sample_fmt, sample_rate, av_get_default_channel_layout(nb_channels));
+			settings->video_codec_id, settings->video_codec_options, AVRational{ frame_rate_numerator, frame_rate_denominator }, pix_fmt,
+			settings->audio_codec_id, settings->audio_codec_options, sample_fmt, sample_rate, av_get_default_channel_layout(nb_channels));
 	}
 	catch (std::exception&) {
 	}
