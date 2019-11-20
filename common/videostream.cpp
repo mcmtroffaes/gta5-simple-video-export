@@ -30,7 +30,7 @@ AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt, uint8_
 	return frame;
 }
 
-VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
+VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVDictionary** options, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
 	: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }, dst_frame{ nullptr }
 {
 	LOG_ENTER;
@@ -59,7 +59,7 @@ VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 			av_get_pix_fmt_name(pix_fmt),
 			av_get_pix_fmt_name(context->pix_fmt));
 	}
-	int ret = avcodec_open2(context.get(), NULL, NULL);
+	int ret = avcodec_open2(context.get(), NULL, options);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to open video codec: {}", AVErrorString(ret)));
 	avcodec_parameters_from_context(stream->codecpar, context.get());

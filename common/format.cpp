@@ -1,9 +1,12 @@
 #include "format.h"
 
-Format::Format(const std::filesystem::path& filename, AVCodecID vcodec, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt, AVCodecID acodec, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+Format::Format(
+	const std::filesystem::path& filename,
+	AVCodecID vcodec, AVDictionary** voptions, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
+	AVCodecID acodec, AVDictionary** aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 	: context{ CreateAVFormatContext(filename) }
-	, vstream{ std::make_unique<VideoStream>(context, vcodec, width, height, frame_rate, pix_fmt) }
-	, astream{ std::make_unique<AudioStream>(context, acodec, sample_fmt, sample_rate, channel_layout) }
+	, vstream{ std::make_unique<VideoStream>(context, vcodec, voptions, width, height, frame_rate, pix_fmt) }
+	, astream{ std::make_unique<AudioStream>(context, acodec, aoptions, sample_fmt, sample_rate, channel_layout) }
 {
 	LOG_ENTER;
 	// the ffmpeg API expects a utf8 encoded const char * for the filename

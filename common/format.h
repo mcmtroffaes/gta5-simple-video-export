@@ -15,8 +15,8 @@ public:
 
 	Format(
 		const std::filesystem::path& filename,
-		AVCodecID vcodec, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
-		AVCodecID acodec, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout);
+		AVCodecID vcodec, AVDictionary** voptions, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
+		AVCodecID acodec, AVDictionary** aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout);
 
 	// flush streams and write the footer
 	void Flush();

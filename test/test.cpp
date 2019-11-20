@@ -163,8 +163,8 @@ void Test(
 	std::unique_ptr<Format> format{ nullptr };
 	format = std::make_unique<Format>(
 		filename,
-		vcodec_id, width, height, frame_rate, pix_fmt,
-		acodec_id, sample_fmt, sample_rate, channel_layout);
+		vcodec_id, nullptr, width, height, frame_rate, pix_fmt,
+		acodec_id, nullptr, sample_fmt, sample_rate, channel_layout);
 	const auto atb = AVRational{ 1, sample_rate };
 	const auto vtb = av_inv_q(frame_rate);
 	int apts = 0;
