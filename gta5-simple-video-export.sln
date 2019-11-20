@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28803.156
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gta5-simple-video-export", "gta5-simple-video-export\gta5-simple-video-export.vcxproj", "{2D6CDF29-CC49-433A-BCB4-BAA073F076F8}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "plugin", "plugin\plugin.vcxproj", "{2D6CDF29-CC49-433A-BCB4-BAA073F076F8}"
 	ProjectSection(ProjectDependencies) = postProject
 		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7} = {5B01D900-2359-44CA-9914-6B0C6AFB7BE7}
 		{A9E7F931-C240-4215-95D2-71EEF0980B39} = {A9E7F931-C240-4215-95D2-71EEF0980B39}
