@@ -11,7 +11,7 @@ after_build:
   - pushd x64\Release
   - ps: Copy-Item -Path "..\..\plugin\*.ini" -Destination .
   - ps: Copy-Item -Path "..\..\test\*.ini" -Destination .
-  - dir /s /b *.asi *.ini
+  - dir /s /b *.asi *.exe *.ini
   - 7z a -r ..\..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
 test: off
 artifacts:
