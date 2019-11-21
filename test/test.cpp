@@ -1,4 +1,5 @@
 #include <codecvt>
+#include <fstream>
 #include <iostream>
 #include <memory>
 extern "C" {
@@ -202,19 +203,33 @@ int main()
 	AVLogSetCallback();
 	settings = std::make_unique<Settings>();
 	LOG_ENTER;
+	auto test_settings = inipp::Ini<char>();
+	const std::filesystem::path ini_test_filename_{ SCRIPT_NAME "Test.ini" };
+	std::ifstream is{ ini_test_filename_ };
+	if (is.fail()) {
+		LOG->error("failed to open \"{}\"", ini_test_filename_.u8string());
+	}
+	else {
+		test_settings.parse(is);
+		if (!test_settings.errors.empty()) {
+			for (const auto& error : test_settings.errors) {
+				LOG->error("failed to parse \"{}\"", error);
+			}
+		}
+	}
 	auto frame_rate_numerator{ 30000 };
 	auto frame_rate_denominator{ 1001 };
 	std::string pix_fmt_name{ "yuv420p" };
 	std::string sample_fmt_name{ "s16" };
 	auto sample_rate{ 44100 };
 	auto nb_channels{ 2 };
-	auto testsec = settings->GetSec("test");
-	settings->GetVar(testsec, "frame_rate_numerator", frame_rate_numerator);
-	settings->GetVar(testsec, "frame_rate_denominator", frame_rate_denominator);
-	settings->GetVar(testsec, "pix_fmt", pix_fmt_name);
-	settings->GetVar(testsec, "sample_fmt", sample_fmt_name);
-	settings->GetVar(testsec, "sample_rate", sample_rate);
-	settings->GetVar(testsec, "nb_channels", nb_channels);
+	auto& testsec = test_settings.sections["test"];
+	inipp::extract(testsec["frame_rate_numerator"], frame_rate_numerator);
+	inipp::extract(testsec["frame_rate_denominator"], frame_rate_denominator);
+	inipp::extract(testsec["pix_fmt"], pix_fmt_name);
+	inipp::extract(testsec["sample_fmt"], sample_fmt_name);
+	inipp::extract(testsec["sample_rate"], sample_rate);
+	inipp::extract(testsec["nb_channels"], nb_channels);
 	auto pix_fmt = av_get_pix_fmt(pix_fmt_name.c_str());
 	auto sample_fmt = av_get_sample_fmt(sample_fmt_name.c_str());
 	if (pix_fmt == AV_PIX_FMT_NONE) {
