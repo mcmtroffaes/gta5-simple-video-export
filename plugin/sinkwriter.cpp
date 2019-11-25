@@ -8,21 +8,22 @@ SinkWriter hooks.
 
 Under normal circumstances, the game will then call SinkWriterSetInputMediaType
 twice, once for the audio, and once for the video. At this point, we intercept
-the audio and video information (resolution, format, ...).
+the audio and video information (resolution, format, ...) and store those the
+audio_info and video_info variables.
 
-After that, the game will call SinkWriterBeginWriting. There, we propagate all
-the information gathered so far into the ini file (via UpdateSettings), we
-interpolate the ini file, we create the file handles that will contain the
-raw exported audio and video, and we create the batch file for post-processing.
+After that, the game will call SinkWriterBeginWriting. There, we create the
+format variable which provides the main interface for encoding the audio and
+video data.
 
 Next, the game will repeatedly call SinkWriterWriteSample. We intercept the
 raw data and transcode it ourselves. Note that SinkWriterWriteSample is
 called from different threads for audio and for video, so we must ensure
 that all transcode calls are thread safe. This is the purpose of
-transcode_mutex.
+format_mutex. For safety, we lock this mutex whenever we access format.
 
 At the end of the export process, the game calls SinkWriterFinalize. There we
-unhook all the SinkWriter hooks (this will also close all files).
+flush the encoder, clear the format (this will finalize the file), and unhook
+all the SinkWriter hooks.
 */
 
 #include "sinkwriter.h"
@@ -56,7 +57,7 @@ std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
 std::unique_ptr<Format> format = nullptr;
-std::mutex transcode_mutex;
+std::mutex format_mutex;
 
 void UnhookVFuncDetours()
 {
@@ -67,7 +68,10 @@ void UnhookVFuncDetours()
 	finalize_hook = nullptr;
 	audio_info = nullptr;
 	video_info = nullptr;
-	format = nullptr;
+	{
+		std::lock_guard<std::mutex> lock(format_mutex);
+		format = nullptr;
+	}
 	LOG_EXIT;
 }
 
@@ -133,11 +137,13 @@ STDAPI SinkWriterBeginWriting(
 	LOG->trace("IMFSinkWriter::BeginWriting: enter");
 	auto hr = original_func(pThis);
 	LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
-	if (settings && audio_info && video_info)
+	if (settings && audio_info && video_info) {
+		std::lock_guard<std::mutex> lock(format_mutex);
 		format = std::make_unique<Format>(
 			settings->export_filename,
 			settings->video_codec_id, settings->video_codec_options, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
 			settings->audio_codec_id, settings->audio_codec_options, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
+	}
 	LOG_EXIT;
 	return hr;
 }
@@ -171,7 +177,7 @@ STDAPI SinkWriterWriteSample(
 			else {
 				auto frame = CreateAudioFrame(
 					audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout, nb_samples, p_buffer);
-				std::lock_guard<std::mutex> lock(transcode_mutex);
+				std::lock_guard<std::mutex> lock(format_mutex);
 				format->astream.Transcode(frame);
 			}
 		}
@@ -186,7 +192,7 @@ STDAPI SinkWriterWriteSample(
 			else {
 				auto frame = CreateVideoFrame(
 					video_info->width, video_info->height, video_info->pix_fmt, p_buffer);
-				std::lock_guard<std::mutex> lock(transcode_mutex);
+				std::lock_guard<std::mutex> lock(format_mutex);
 				format->vstream.Transcode(frame);
 			}
 		}
@@ -211,8 +217,11 @@ STDAPI SinkWriterFinalize(
 {
 	LOG_ENTER;
 	LOG->info("flushing transcoder");
-	format->Flush();
-	format = nullptr;
+	{
+		std::lock_guard<std::mutex> lock(format_mutex);
+		format->Flush();
+		format = nullptr;
+	}
 	if (!finalize_hook) {
 		LOG->error("IMFSinkWriter::Finalize hook not set up");
 		return E_FAIL;

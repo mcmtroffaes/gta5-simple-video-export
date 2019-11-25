@@ -207,7 +207,7 @@ int main()
 	const std::filesystem::path ini_test_filename_{ SCRIPT_NAME "Test.ini" };
 	std::ifstream is{ ini_test_filename_ };
 	if (is.fail()) {
-		LOG->error("failed to open \"{}\"", ini_test_filename_.u8string());
+		LOG->error("failed to open \"{}\"", ini_test_filename_.string());
 	}
 	else {
 		test_settings.parse(is);
