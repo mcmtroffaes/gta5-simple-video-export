@@ -81,7 +81,7 @@ auto FindBestChannelLayout(const AVCodec* codec, uint64_t channel_layout) {
 	return best_layout;
 }
 
-AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, const AVDictionaryPtr& options, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVDictionaryPtr& options, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 	: Stream{ format_context, codec_id }
 	, sample_fmt{ sample_fmt }, sample_rate{ sample_rate }
 	, channel_layout{ channel_layout }, channels { av_get_channel_layout_nb_channels(channel_layout) }
@@ -111,8 +111,9 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 			GetChannelLayoutString(context->channel_layout));
 	context->channels = av_get_channel_layout_nb_channels(context->channel_layout);
 	context->time_base = AVRational{ 1, context->sample_rate };
-	auto dict = options.get();
+	auto dict = options.release();
 	auto ret = avcodec_open2(context.get(), nullptr, &dict);
+	options.reset(dict);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to open audio codec: {}", AVErrorString(ret)));
 	avcodec_parameters_from_context(stream->codecpar, context.get());

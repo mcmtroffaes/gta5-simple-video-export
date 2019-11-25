@@ -155,8 +155,8 @@ auto MakeAudioData(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_
 
 void Test(
 	const std::filesystem::path& filename,
-	AVCodecID vcodec_id, const AVDictionaryPtr& voptions, AVRational frame_rate, AVPixelFormat pix_fmt,
-	AVCodecID acodec_id, const AVDictionaryPtr& aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+	AVCodecID vcodec_id, AVDictionaryPtr& voptions, AVRational frame_rate, AVPixelFormat pix_fmt,
+	AVCodecID acodec_id, AVDictionaryPtr& aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 {
 	LOG->info("export started");
 	auto width = 416;

@@ -38,7 +38,7 @@ private:
 
 public:
 	// set up stream with the given parameters
-	AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, const AVDictionaryPtr& options, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout);
+	AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVDictionaryPtr& options, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout);
 
 	// transcode the data to a format that is compatible with the codec
 	// (needs to match sample_fmt and channel_layout as specified in constructor)
