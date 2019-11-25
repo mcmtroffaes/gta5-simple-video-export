@@ -135,6 +135,8 @@ Settings::Settings()
 		LOG->error("container format {} not supported, falling back to mkv", container);
 		export_filename = folder;
 		export_filename /= basename + ".mkv";
+		u8_export_filename = export_filename.u8string();
+		c_export_filename = reinterpret_cast<const char*>(u8_export_filename.c_str());
 		oformat = av_guess_format(nullptr, c_export_filename, nullptr);
 		if (!oformat)
 			LOG_THROW(std::runtime_error, "mkv output format not supported");
