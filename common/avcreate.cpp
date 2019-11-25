@@ -14,10 +14,10 @@ AVFormatContextPtr CreateAVFormatContext(const std::filesystem::path& filename) 
 }
 
 void AVFormatContextDeleter::operator()(AVFormatContext* context) const {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	if (context) avio_closep(&context->pb);
 	avformat_free_context(context);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 AVCodecPtr CreateAVCodec(const AVCodecID& codec_id) {
@@ -52,9 +52,9 @@ AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec) {
 }
 
 void AVCodecContextDeleter::operator()(AVCodecContext* context) const {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	avcodec_free_context(&context);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 AVFramePtr CreateAVFrame() {
@@ -68,9 +68,9 @@ AVFramePtr CreateAVFrame() {
 }
 
 void AVFrameDeleter::operator()(AVFrame* frame) const {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	av_frame_free(&frame);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 SwrContextPtr CreateSwrContext(
@@ -93,9 +93,9 @@ SwrContextPtr CreateSwrContext(
 }
 
 void SwrContextDeleter::operator()(SwrContext* swr) const {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	swr_free(&swr);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 SwsContextPtr CreateSwsContext(int srcW, int srcH, AVPixelFormat srcFormat, int dstW, int dstH, AVPixelFormat dstFormat, int flags) {
@@ -111,9 +111,9 @@ SwsContextPtr CreateSwsContext(int srcW, int srcH, AVPixelFormat srcFormat, int 
 }
 
 void SwsContextDeleter::operator()(SwsContext* sws) const {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	sws_freeContext(sws);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 AVAudioFifoPtr CreateAVAudioFifo(AVSampleFormat sample_fmt, int channels, int nb_samples) {
@@ -126,9 +126,9 @@ AVAudioFifoPtr CreateAVAudioFifo(AVSampleFormat sample_fmt, int channels, int nb
 }
 
 void AVAudioFifoDeleter::operator()(AVAudioFifo* fifo) const {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	av_audio_fifo_free(fifo);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 AVDictionaryPtr CreateAVDictionary(const std::string& options, const std::string& key_val_sep, const std::string& pairs_sep)
@@ -144,7 +144,7 @@ AVDictionaryPtr CreateAVDictionary(const std::string& options, const std::string
 
 void AVDictionaryDeleter::operator()(AVDictionary* dict) const
 {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	av_dict_free(&dict);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
