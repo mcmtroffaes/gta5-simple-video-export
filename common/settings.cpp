@@ -88,7 +88,7 @@ Settings::Settings()
 	}
 	auto level{ spdlog::level::info };
 	auto flush_on{ spdlog::level::off };
-	auto sec = GetSec("log");
+	auto sec = GetSec(sections, "log");
 	GetVar(sec, "level", level);
 	GetVar(sec, "flush_on", flush_on);
 	if (logger) {
@@ -116,14 +116,14 @@ Settings::Settings()
 	// interpolate all variables
 	interpolate();
 	// set up a valid filename
-	auto exportsec = GetSec("export");
+	auto exportsec = GetSec(sections, "export");
 	std::string folder{ "." };
 	std::string basename{ "sve-" + timestamp };
 	std::string preset{ };
 	GetVar(exportsec, "folder", folder);
 	GetVar(exportsec, "basename", basename);
 	GetVar(exportsec, "preset", preset);
-	auto presetsec = GetSec(preset);
+	auto presetsec = GetSec(sections, preset);
 	std::string container{ "mkv" };
 	GetVar(presetsec, "container", container);
 	export_filename = folder;
@@ -170,14 +170,14 @@ Settings::Settings()
 
 const Settings::Section empty_section{};
 
-const Settings::Section & Settings::GetSec(const std::string & sec_name) const {
-	LOG_ENTER_METHOD;
+const inipp::Ini<char>::Section& GetSec(const inipp::Ini<char>::Sections& sections, const std::string & sec_name) {
+	LOG_ENTER;
 	auto sec = sections.find(sec_name);
 	if (sec == sections.end()) {
 		LOG->error("section [{}] not found", sec_name);
-		LOG_EXIT_METHOD;
+		LOG_EXIT;
 		return empty_section;
 	}
-	LOG_EXIT_METHOD;
+	LOG_EXIT;
 	return sec->second;
 }

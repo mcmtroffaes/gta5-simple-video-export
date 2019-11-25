@@ -11,6 +11,8 @@ extern "C" {
 
 #define SCRIPT_NAME "SimpleVideoExport"
 
+const inipp::Ini<char>::Section& GetSec(const inipp::Ini<char>::Sections& sections, const std::string& sec_name);
+
 template <typename T>
 bool GetVar(const inipp::Ini<char>::Section& sec, const std::basic_string<char>& var_name, T& value)
 {
@@ -41,8 +43,6 @@ public:
 	AVDictionaryPtr audio_codec_options;
 
 	Settings();
-
-	const Section & GetSec(const std::string & sec_name) const;
 };
 
 /* declaration resides in dllmain.cpp */

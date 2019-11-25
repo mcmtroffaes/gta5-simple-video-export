@@ -258,7 +258,7 @@ STDAPI CreateSinkWriterFromURL(
 	// reload settings to see if the mod is enabled, and to get the latest settings
 	settings = std::make_unique<Settings>();
 	auto enable = true;
-	auto exportsec = settings->GetSec("export");
+	auto exportsec = GetSec(settings->sections, "export");
 	GetVar(exportsec, "enable", enable);
 	if (!enable) {
 		LOG->info("mod disabled, default in-game video export will be used");

@@ -223,7 +223,7 @@ int main()
 	std::string sample_fmt_name{ "s16" };
 	auto sample_rate{ 44100 };
 	auto nb_channels{ 2 };
-	auto& testsec = test_settings.sections["test"];
+	auto& testsec = GetSec(test_settings.sections, "test");
 	GetVar(testsec, "frame_rate_numerator", frame_rate_numerator);
 	GetVar(testsec, "frame_rate_denominator", frame_rate_denominator);
 	GetVar(testsec, "pix_fmt", pix_fmt_name);
