@@ -259,7 +259,7 @@ STDAPI CreateSinkWriterFromURL(
 	settings = std::make_unique<Settings>();
 	auto enable = true;
 	auto exportsec = settings->GetSec("export");
-	settings->GetVar(exportsec, "enable", enable);
+	GetVar(exportsec, "enable", enable);
 	if (!enable) {
 		LOG->info("mod disabled, default in-game video export will be used");
 		UnhookVFuncDetours();

@@ -224,12 +224,12 @@ int main()
 	auto sample_rate{ 44100 };
 	auto nb_channels{ 2 };
 	auto& testsec = test_settings.sections["test"];
-	inipp::extract(testsec["frame_rate_numerator"], frame_rate_numerator);
-	inipp::extract(testsec["frame_rate_denominator"], frame_rate_denominator);
-	inipp::extract(testsec["pix_fmt"], pix_fmt_name);
-	inipp::extract(testsec["sample_fmt"], sample_fmt_name);
-	inipp::extract(testsec["sample_rate"], sample_rate);
-	inipp::extract(testsec["nb_channels"], nb_channels);
+	GetVar(testsec, "frame_rate_numerator", frame_rate_numerator);
+	GetVar(testsec, "frame_rate_denominator", frame_rate_denominator);
+	GetVar(testsec, "pix_fmt", pix_fmt_name);
+	GetVar(testsec, "sample_fmt", sample_fmt_name);
+	GetVar(testsec, "sample_rate", sample_rate);
+	GetVar(testsec, "nb_channels", nb_channels);
 	auto pix_fmt = av_get_pix_fmt(pix_fmt_name.c_str());
 	auto sample_fmt = av_get_sample_fmt(sample_fmt_name.c_str());
 	if (pix_fmt == AV_PIX_FMT_NONE) {

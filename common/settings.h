@@ -11,6 +11,25 @@ extern "C" {
 
 #define SCRIPT_NAME "SimpleVideoExport"
 
+template <typename T>
+bool GetVar(const inipp::Ini<char>::Section& sec, const std::basic_string<char>& var_name, T& value)
+{
+	LOG_ENTER;
+	bool found = false;
+	auto var = sec.find(var_name);
+	if (var == sec.end()) {
+		LOG->warn("variable {} not found", var_name);
+	}
+	else {
+		found = inipp::extract(var->second, value);
+		if (!found) {
+			LOG->error("failed to parse {}", var->second);
+		}
+	}
+	LOG_EXIT;
+	return found;
+}
+
 class Settings : public inipp::Ini<char>
 {
 public:
@@ -24,25 +43,6 @@ public:
 	Settings();
 
 	const Section & GetSec(const std::string & sec_name) const;
-
-	template <typename T>
-	bool GetVar(const Section & sec, const std::string & var_name, T & value) const
-	{
-		LOG_ENTER;
-		bool found = false;
-		auto var = sec.find(var_name);
-		if (var == sec.end()) {
-			LOG->warn("variable {} not found", var_name);
-		}
-		else {
-			found = inipp::extract(var->second, value);
-			if (!found) {
-				LOG->error("failed to parse {}", var->second);
-			}
-		}
-		LOG_EXIT;
-		return found;
-	}
 };
 
 /* declaration resides in dllmain.cpp */
