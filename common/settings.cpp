@@ -139,7 +139,7 @@ Settings::Settings()
 		c_export_filename = reinterpret_cast<const char*>(u8_export_filename.c_str());
 		oformat = av_guess_format(nullptr, c_export_filename, nullptr);
 		if (!oformat)
-			LOG_THROW(std::runtime_error, "mkv output format not supported");
+			LOG_THROW(std::runtime_error, "mkv container format not supported");
 	}
 	// set up valid video codec
 	std::string videocodec_value{ };
