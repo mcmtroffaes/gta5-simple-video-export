@@ -4,11 +4,13 @@
 AVFormatContextPtr CreateAVFormatContext(const std::filesystem::path& filename) {
 	LOG_ENTER;
 	AVFormatContext* context{ nullptr };
-	int ret{ avformat_alloc_output_context2(&context, NULL, NULL, filename.u8string().c_str()) };
+	auto u8_filename{ filename.u8string() };
+	auto c_filename{ reinterpret_cast<const char*>(u8_filename.c_str()) };
+	auto ret{ avformat_alloc_output_context2(&context, nullptr, nullptr, c_filename) };
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}': {}", filename.u8string(), AVErrorString(ret)));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}': {}", c_filename, AVErrorString(ret)));
 	if (!context)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}'", filename.u8string()));
+		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}'", c_filename));
 	LOG_EXIT;
 	return AVFormatContextPtr{ context };
 }

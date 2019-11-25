@@ -73,10 +73,10 @@ Settings::Settings()
 	, audio_codec_id{ AV_CODEC_ID_NONE }
 {
 	// LOG_ENTER is deferred until the log level is set
-	LOG->debug("parsing {}", ini_filename_.u8string());
+	LOG->debug("parsing {}", ini_filename_.string());
 	std::ifstream is(ini_filename_);
 	if (is.fail()) {
-		LOG->error("failed to open \"{}\"", ini_filename_.u8string());
+		LOG->error("failed to open \"{}\"", ini_filename_.string());
 	}
 	else {
 		parse(is);
@@ -128,12 +128,14 @@ Settings::Settings()
 	GetVar(presetsec, "container", container);
 	export_filename = folder;
 	export_filename /= basename + "." + container;
-	auto oformat = av_guess_format(nullptr, export_filename.u8string().c_str(), nullptr);
+	auto u8_export_filename{ export_filename.u8string() };
+	auto c_export_filename{ reinterpret_cast<const char*>(u8_export_filename.c_str()) };
+	auto oformat = av_guess_format(nullptr, c_export_filename, nullptr);
 	if (!oformat) {
 		LOG->error("container format {} not supported, falling back to mkv", container);
 		export_filename = folder;
 		export_filename /= basename + ".mkv";
-		oformat = av_guess_format(nullptr, export_filename.u8string().c_str(), nullptr);
+		oformat = av_guess_format(nullptr, c_export_filename, nullptr);
 		if (!oformat)
 			LOG_THROW(std::runtime_error, "mkv output format not supported");
 	}
