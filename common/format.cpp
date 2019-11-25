@@ -10,7 +10,8 @@ Format::Format(
 {
 	LOG_ENTER;
 	// the ffmpeg API expects a utf8 encoded const char * for the filename
-	auto c_filename{ reinterpret_cast<const char*>(filename.u8string().c_str()) };
+	auto u8_filename{ filename.u8string() };
+	auto c_filename{ reinterpret_cast<const char*>(u8_filename.c_str()) };
 	av_dump_format(context.get(), 0, c_filename, 1);
 	// none of the above functions should set context to null, but just in case...
 	if (!context)
