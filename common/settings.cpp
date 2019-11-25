@@ -97,7 +97,7 @@ Settings::Settings()
 		logger->flush_on(flush_on);
 	}
 	AVLogSetLevel(level);
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	Section & builtinsec = sections["builtin"];
 	auto timestamp = TimeStamp();
 	builtinsec["timestamp"] = timestamp;
@@ -161,19 +161,19 @@ Settings::Settings()
 			"audio codec {} not supported, falling back to {}",
 			audiocodec_name, avcodec_get_name(audiocodec_fallback));
 	audio_codec_id = audiocodec ? audiocodec->id : audiocodec_fallback;
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 const Settings::Section empty_section{};
 
 const Settings::Section & Settings::GetSec(const std::string & sec_name) const {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	auto sec = sections.find(sec_name);
 	if (sec == sections.end()) {
 		LOG->error("section [{}] not found", sec_name);
-		LOG_EXIT;
+		LOG_EXIT_METHOD;
 		return empty_section;
 	}
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 	return sec->second;
 }

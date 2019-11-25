@@ -8,7 +8,7 @@ Format::Format(
 	, vstream{ std::make_unique<VideoStream>(context, vcodec, voptions, width, height, frame_rate, pix_fmt) }
 	, astream{ std::make_unique<AudioStream>(context, acodec, aoptions, sample_fmt, sample_rate, channel_layout) }
 {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	// the ffmpeg API expects a utf8 encoded const char * for the filename
 	auto u8_filename{ filename.u8string() };
 	auto c_filename{ reinterpret_cast<const char*>(u8_filename.c_str()) };
@@ -24,11 +24,12 @@ Format::Format(
 		if (ret < 0)
 			LOG_THROW(std::runtime_error, fmt::format("failed to write header: {}", AVErrorString(ret)));
 	}
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 void Format::Flush()
 {
+	LOG_ENTER_METHOD;
 	if (vstream)
 		vstream->Transcode(nullptr);
 	if (astream)
@@ -36,5 +37,6 @@ void Format::Flush()
 	int ret = av_write_trailer(context.get());
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to write trailer: {}", AVErrorString(ret)));
+	LOG_EXIT_METHOD;
 }
 

@@ -6,6 +6,7 @@ extern "C" {
 }
 
 AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt) {
+	LOG_ENTER;
 	auto frame = CreateAVFrame();
 	frame->width = width;
 	frame->height = height;
@@ -13,10 +14,12 @@ AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt) {
 	int ret = av_frame_get_buffer(frame.get(), 0);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));	
+	LOG_EXIT;
 	return frame;
 }
 
 AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt, uint8_t* ptr) {
+	LOG_ENTER;
 	auto frame = CreateAVFrame();
 	frame->width = width;
 	frame->height = height;
@@ -27,13 +30,14 @@ AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt, uint8_
 	ret = av_image_fill_pointers(frame->data, pix_fmt, height, ptr, frame->linesize);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, "failed to get image pointers");
+	LOG_EXIT;
 	return frame;
 }
 
 VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVDictionaryPtr& options, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
 	: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }, dst_frame{ nullptr }
 {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	if (context->codec->type != AVMEDIA_TYPE_VIDEO)
 		LOG_THROW(std::invalid_argument, fmt::format("selected video codec {} does not support video", context->codec->name));
 	context->width = width;
@@ -71,12 +75,12 @@ VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	stream->time_base = context->time_base;
 	dst_frame = CreateVideoFrame(width, height, context->pix_fmt);
 	dst_frame->pts = 0;
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 void VideoStream::Transcode(const AVFramePtr& src_frame)
 {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	// nullptr means flushing the encoder
 	if (!src_frame) {
 		Encode(nullptr);
@@ -97,6 +101,6 @@ void VideoStream::Transcode(const AVFramePtr& src_frame)
 	Encode(dst_frame);
 	// update destination frame timestamp
 	dst_frame->pts += 1;
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 

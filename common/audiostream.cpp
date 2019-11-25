@@ -1,35 +1,43 @@
 #include "audiostream.h"
 
 AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout) {
+	LOG_ENTER;
 	auto frame = CreateAVFrame();
 	frame->format = sample_fmt;
 	frame->sample_rate = sample_rate;
 	frame->channel_layout = channel_layout;
 	frame->channels = av_get_channel_layout_nb_channels(channel_layout);
+	LOG_EXIT;
 	return frame;
 }
 
 AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout, int nb_samples) {
+	LOG_ENTER;
 	auto frame = CreateAudioFrame(sample_fmt, sample_rate, channel_layout);
 	frame->nb_samples = nb_samples;
 	int ret = av_frame_get_buffer(frame.get(), 0);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
+	LOG_EXIT;
 	return frame;
 }
 
 AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout, int nb_samples, const uint8_t* ptr) {
+	LOG_ENTER;
 	auto frame = CreateAudioFrame(sample_fmt, sample_rate, channel_layout);
 	frame->nb_samples = nb_samples;
 	int ret = av_samples_fill_arrays(frame->data, frame->linesize, ptr, frame->channels, nb_samples, sample_fmt, 1);
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to fill audio sample arrays: {}", AVErrorString(ret)));
+	LOG_EXIT;
 	return frame;
 }
 
 auto GetChannelLayoutString(uint64_t channel_layout) {
+	LOG_ENTER;
 	char buf[64]{ 0 };
 	av_get_channel_layout_string(buf, sizeof(buf), 0, channel_layout);
+	LOG_EXIT;
 	return std::string(buf);
 }
 
@@ -87,7 +95,7 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	, channel_layout{ channel_layout }, channels { av_get_channel_layout_nb_channels(channel_layout) }
 	, dst_frame{ nullptr }, swr{ nullptr }, fifo{ nullptr }
 {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	if (context->codec_type != AVMEDIA_TYPE_AUDIO)
 		LOG_THROW(std::invalid_argument, "selected audio codec does not support audio");
 	context->sample_fmt = FindBestSampleFmt(context->codec, sample_fmt);
@@ -128,12 +136,12 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 		context->channel_layout, context->sample_fmt, context->sample_rate, // out
 		channel_layout, sample_fmt, sample_rate); // in
 	fifo = CreateAVAudioFifo(context->sample_fmt, context->channels, dst_frame->nb_samples);
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
 
 void AudioStream::Transcode(const AVFramePtr& src_frame)
 {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	// create buffer frame
 	auto buf_frame = CreateAudioFrame(context->sample_fmt, context->sample_rate, context->channel_layout);
 	// resample source frame to buffer frame
@@ -169,5 +177,5 @@ void AudioStream::Transcode(const AVFramePtr& src_frame)
 		if (nb_lost)
 			LOG->warn("audio buffer not completely flushed, {} samples lost");
 	}
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }

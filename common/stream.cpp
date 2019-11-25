@@ -22,15 +22,15 @@ Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec
 	, stream{ CreateAVStream(*format_context, *codec) }
 	, context{ CreateAVCodecContext(*codec) }
 {
-	LOG_ENTER;
-	LOG_EXIT;
+	LOG_ENTER_METHOD;
+	LOG_EXIT_METHOD;
 }
 
 // encode and write the given frame to the stream
 // to flush the encoder, send a nullptr as frame
 void Stream::Encode(const AVFramePtr& frame)
 {
-	LOG_ENTER;
+	LOG_ENTER_METHOD;
 	AVPacket pkt;
 	av_init_packet(&pkt);
 	// send frame for encoding
@@ -67,5 +67,5 @@ void Stream::Encode(const AVFramePtr& frame)
 	}
 	if (ret_packet != AVERROR(EAGAIN) && (ret_packet != AVERROR_EOF))
 		LOG_THROW(std::runtime_error, fmt::format("failed to receive packet from encoder: {}", AVErrorString(ret_packet)));
-	LOG_EXIT;
+	LOG_EXIT_METHOD;
 }
