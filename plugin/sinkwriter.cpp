@@ -172,7 +172,7 @@ STDAPI SinkWriterWriteSample(
 				auto frame = CreateAudioFrame(
 					audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout, nb_samples, p_buffer);
 				std::lock_guard<std::mutex> lock(transcode_mutex);
-				format->astream->Transcode(frame);
+				format->astream.Transcode(frame);
 			}
 		}
 		if (video_info && dwStreamIndex == video_info->stream_index) {
@@ -187,7 +187,7 @@ STDAPI SinkWriterWriteSample(
 				auto frame = CreateVideoFrame(
 					video_info->width, video_info->height, video_info->pix_fmt, p_buffer);
 				std::lock_guard<std::mutex> lock(transcode_mutex);
-				format->vstream->Transcode(frame);
+				format->vstream.Transcode(frame);
 			}
 		}
 		memset(p_buffer, 0, buffer_length); // clear sample so game will output blank video/audio

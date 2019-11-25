@@ -5,8 +5,8 @@ Format::Format(
 	AVCodecID vcodec, AVDictionaryPtr& voptions, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt,
 	AVCodecID acodec, AVDictionaryPtr& aoptions, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
 	: context{ CreateAVFormatContext(filename) }
-	, vstream{ std::make_unique<VideoStream>(context, vcodec, voptions, width, height, frame_rate, pix_fmt) }
-	, astream{ std::make_unique<AudioStream>(context, acodec, aoptions, sample_fmt, sample_rate, channel_layout) }
+	, vstream{ context, vcodec, voptions, width, height, frame_rate, pix_fmt }
+	, astream{ context, acodec, aoptions, sample_fmt, sample_rate, channel_layout }
 {
 	LOG_ENTER_METHOD;
 	// the ffmpeg API expects a utf8 encoded const char * for the filename
@@ -30,10 +30,8 @@ Format::Format(
 void Format::Flush()
 {
 	LOG_ENTER_METHOD;
-	if (vstream)
-		vstream->Transcode(nullptr);
-	if (astream)
-		astream->Transcode(nullptr);
+	vstream.Transcode(nullptr);
+	astream.Transcode(nullptr);
 	int ret = av_write_trailer(context.get());
 	if (ret < 0)
 		LOG_THROW(std::runtime_error, fmt::format("failed to write trailer: {}", AVErrorString(ret)));

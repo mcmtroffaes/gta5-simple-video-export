@@ -177,7 +177,7 @@ void Test(
 				sample_fmt, sample_rate, channel_layout,
 				nb_samples, apts);
 			auto aframe = CreateAudioFrame(sample_fmt, sample_rate, channel_layout, nb_samples, adata.get());
-			format->astream->Transcode(aframe);
+			format->astream.Transcode(aframe);
 			apts += nb_samples;
 		}
 		while (av_compare_ts(apts, atb, vpts, vtb) >= 0) {
@@ -185,7 +185,7 @@ void Test(
 				width, height, pix_fmt,
 				vpts * av_q2d(vtb));
 			auto vframe = CreateVideoFrame(width, height, pix_fmt, vdata.get());
-			format->vstream->Transcode(vframe);
+			format->vstream.Transcode(vframe);
 			vpts++;
 		}
 	}

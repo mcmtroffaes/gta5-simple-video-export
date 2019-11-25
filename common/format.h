@@ -10,8 +10,8 @@ private:
 	std::shared_ptr<AVFormatContext> context;
 
 public:
-	std::unique_ptr<VideoStream> vstream;
-	std::unique_ptr<AudioStream> astream;
+	VideoStream vstream;
+	AudioStream astream;
 
 	Format(
 		const std::filesystem::path& filename,
