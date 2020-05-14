@@ -84,7 +84,7 @@ void VideoStream::Transcode(const AVFramePtr& src_frame)
 	// nullptr means flushing the encoder
 	if (!src_frame) {
 		Encode(nullptr);
-		LOG_EXIT;
+		LOG_EXIT_METHOD;
 		return;
 	}
 	// fill frame with data given in ptr
