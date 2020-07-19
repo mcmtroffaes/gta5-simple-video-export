@@ -21,7 +21,8 @@ called from different threads for audio and for video, so we must ensure
 that all transcode calls are thread safe. This is the purpose of
 format_mutex. For safety, we lock this mutex whenever we access format.
 
-At the end of the export process, the game calls SinkWriterFinalize. There we
+At the end of the export process, the game calls SinkWriterFinalize if the
+export finished normally, or Flush if the export is cancelled. There we
 flush the encoder, clear the format (this will finalize the file), and unhook
 all the SinkWriter hooks.
 */
@@ -53,6 +54,7 @@ std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> setinputmediatype_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> beginwriting_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
+std::unique_ptr<PLH::VFuncDetour> flush_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
@@ -65,6 +67,7 @@ void UnhookVFuncDetours()
 	setinputmediatype_hook = nullptr;
 	beginwriting_hook = nullptr;
 	writesample_hook = nullptr;
+	flush_hook = nullptr;
 	finalize_hook = nullptr;
 	audio_info = nullptr;
 	video_info = nullptr;
@@ -212,6 +215,32 @@ STDAPI SinkWriterWriteSample(
 	return hr;
 }
 
+STDAPI SinkWriterFlush(
+	IMFSinkWriter* pThis,
+	DWORD         dwStreamIndex)
+{
+	LOG_ENTER;
+	LOG->info("flushing transcoder");
+	{
+		std::lock_guard<std::mutex> lock(format_mutex);
+		format->Flush();
+		format = nullptr;
+	}
+	if (!flush_hook) {
+		LOG->error("IMFSinkWriter::Flush hook not set up");
+		return E_FAIL;
+	}
+	auto original_func = flush_hook->GetOriginal<decltype(&SinkWriterFlush)>();
+	LOG->trace("IMFSinkWriter::Flush: enter");
+	auto hr = original_func(pThis, dwStreamIndex);
+	LOG->trace("IMFSinkWriter::Flush: exit {}", hr);
+	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
+	UnhookVFuncDetours();
+	LOG->info("export cancelled");
+	LOG_EXIT;
+	return hr;
+}
+
 STDAPI SinkWriterFinalize(
 	IMFSinkWriter *pThis)
 {
@@ -245,6 +274,9 @@ STDAPI CreateSinkWriterFromURL(
 	)
 {
 	LOG_ENTER;
+	// unhook any dangling detours
+	UnhookVFuncDetours();
+	// now start export
 	LOG->info("export started");
 	if (!sinkwriter_hook) {
 		LOG->error("MFCreateSinkWriterFromURL hook not set up");
@@ -262,15 +294,14 @@ STDAPI CreateSinkWriterFromURL(
 	GetVar(exportsec, "enable", enable);
 	if (!enable) {
 		LOG->info("mod disabled, default in-game video export will be used");
-		UnhookVFuncDetours();
 	}
 	else if (FAILED(hr)) {
 		LOG->info("MFCreateSinkWriterFromURL failed");
-		UnhookVFuncDetours();
 	} else {
 		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
 		beginwriting_hook = CreateVFuncDetour(*ppSinkWriter, 5, &SinkWriterBeginWriting);
 		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
+		flush_hook = CreateVFuncDetour(*ppSinkWriter, 10, &SinkWriterFlush);
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
 	}
 	LOG_EXIT;
