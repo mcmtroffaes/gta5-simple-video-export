@@ -27,6 +27,7 @@ flush the encoder, clear the format (this will finalize the file), and unhook
 all the SinkWriter hooks.
 */
 
+#include "present.h"
 #include "sinkwriter.h"
 #include "logger.h"
 #include "settings.h"
@@ -56,6 +57,7 @@ std::unique_ptr<PLH::VFuncDetour> beginwriting_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> flush_hook = nullptr;
 std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
+std::unique_ptr<SwapChainPresentHook> present_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
 std::unique_ptr<Format> format = nullptr;
@@ -69,6 +71,7 @@ void UnhookVFuncDetours()
 	writesample_hook = nullptr;
 	flush_hook = nullptr;
 	finalize_hook = nullptr;
+	present_hook = nullptr;
 	audio_info = nullptr;
 	video_info = nullptr;
 	{
@@ -303,6 +306,7 @@ STDAPI CreateSinkWriterFromURL(
 		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
 		flush_hook = CreateVFuncDetour(*ppSinkWriter, 10, &SinkWriterFlush);
 		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
+		present_hook = std::make_unique<SwapChainPresentHook>();
 	}
 	LOG_EXIT;
 	return hr;

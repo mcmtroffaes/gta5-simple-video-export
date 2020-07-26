@@ -21,11 +21,13 @@
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="info.cpp" />
+    <ClCompile Include="present.cpp" />
     <ClCompile Include="sinkwriter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hook.h" />
     <ClInclude Include="info.h" />
+    <ClInclude Include="present.h" />
     <ClInclude Include="sinkwriter.h" />
   </ItemGroup>
   <ItemGroup>

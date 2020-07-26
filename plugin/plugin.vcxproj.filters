@@ -24,6 +24,9 @@
     <ClCompile Include="info.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="present.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="sinkwriter.h">
@@ -33,6 +36,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="present.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
