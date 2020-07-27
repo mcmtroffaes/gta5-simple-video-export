@@ -17,7 +17,7 @@ AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t
 	frame->nb_samples = nb_samples;
 	int ret = av_frame_get_buffer(frame.get(), 0);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));
 	LOG_EXIT;
 	return frame;
 }
@@ -28,7 +28,7 @@ AVFramePtr CreateAudioFrame(AVSampleFormat sample_fmt, int sample_rate, uint64_t
 	frame->nb_samples = nb_samples;
 	int ret = av_samples_fill_arrays(frame->data, frame->linesize, ptr, frame->channels, nb_samples, sample_fmt, 1);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to fill audio sample arrays: {}", AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to fill audio sample arrays: {}", AVErrorString(ret)));
 	LOG_EXIT;
 	return frame;
 }
@@ -97,7 +97,7 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 {
 	LOG_ENTER_METHOD;
 	if (context->codec_type != AVMEDIA_TYPE_AUDIO)
-		LOG_THROW(std::invalid_argument, "selected audio codec does not support audio");
+		throw std::invalid_argument("selected audio codec does not support audio");
 	context->sample_fmt = FindBestSampleFmt(context->codec, sample_fmt);
 	if (context->sample_fmt != sample_fmt)
 		LOG->info(
@@ -123,7 +123,7 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	auto ret = avcodec_open2(context.get(), nullptr, &dict);
 	options.reset(dict);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to open audio codec: {}", AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to open audio codec: {}", AVErrorString(ret)));
 	avcodec_parameters_from_context(stream->codecpar, context.get());
 	// note: this is only a hint, actual stream time_base can be different
 	// avformat_write_header will set the final stream time_base
@@ -147,18 +147,18 @@ void AudioStream::Transcode(const AVFramePtr& src_frame)
 	// resample source frame to buffer frame
 	int ret = swr_convert_frame(swr.get(), buf_frame.get(), src_frame.get());
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("resampling error: {}", AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("resampling error: {}", AVErrorString(ret)));
 	// save buffer frame to fifo buffer
 	int nb_written = av_audio_fifo_write(fifo.get(), reinterpret_cast<void**>(buf_frame->data), buf_frame->nb_samples);
 	if (nb_written < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to write to audio buffer: {}", AVErrorString(nb_written)));
+		throw std::runtime_error(fmt::format("failed to write to audio buffer: {}", AVErrorString(nb_written)));
 	if (nb_written != buf_frame->nb_samples)
 		LOG->warn("expected {} samples to be written to audio buffer but wrote {}", buf_frame->nb_samples, nb_written);
 	// read from fifo buffer in chunks of dst_frame->nb_samples, until no further chunks can be read
 	while (av_audio_fifo_size(fifo.get()) >= dst_frame->nb_samples) {
 		int nb_read = av_audio_fifo_read(fifo.get(), reinterpret_cast<void**>(dst_frame->data), dst_frame->nb_samples);
 		if (nb_read < 0)
-			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
+			throw std::runtime_error(fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
 		if (nb_read != dst_frame->nb_samples)
 			LOG->warn("expected {} samples from audio buffer but got {}", dst_frame->nb_samples, nb_read);
 		Encode(dst_frame);
@@ -168,7 +168,7 @@ void AudioStream::Transcode(const AVFramePtr& src_frame)
 	if (!src_frame) {
 		int nb_read = av_audio_fifo_read(fifo.get(), reinterpret_cast<void**>(dst_frame->data), dst_frame->nb_samples);
 		if (nb_read < 0)
-			LOG_THROW(std::runtime_error, fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
+			throw std::runtime_error(fmt::format("audio buffer read error: {}", AVErrorString(nb_read)));
 		dst_frame->nb_samples = nb_read;
 		Encode(dst_frame);
 		dst_frame->pts += nb_read;

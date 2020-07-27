@@ -13,7 +13,7 @@ AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt) {
 	frame->format = pix_fmt;
 	int ret = av_frame_get_buffer(frame.get(), 0);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));	
+		throw std::runtime_error(fmt::format("failed to allocate frame buffer: {}", AVErrorString(ret)));	
 	LOG_EXIT;
 	return frame;
 }
@@ -26,10 +26,10 @@ AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt, uint8_
 	frame->format = pix_fmt;
 	int ret = av_image_fill_linesizes(frame->linesize, pix_fmt, width);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, "failed to get image line sizes");
+		throw std::runtime_error("failed to get image line sizes");
 	ret = av_image_fill_pointers(frame->data, pix_fmt, height, ptr, frame->linesize);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, "failed to get image pointers");
+		throw std::runtime_error("failed to get image pointers");
 	LOG_EXIT;
 	return frame;
 }
@@ -39,7 +39,7 @@ VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 {
 	LOG_ENTER_METHOD;
 	if (context->codec->type != AVMEDIA_TYPE_VIDEO)
-		LOG_THROW(std::invalid_argument, fmt::format("selected video codec {} does not support video", context->codec->name));
+		throw std::invalid_argument(fmt::format("selected video codec {} does not support video", context->codec->name));
 	context->width = width;
 	context->height = height;
 	context->time_base = av_inv_q(frame_rate);
@@ -67,7 +67,7 @@ VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	auto ret = avcodec_open2(context.get(), nullptr, &dict);
 	options.reset(dict);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to open video codec: {}", AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to open video codec: {}", AVErrorString(ret)));
 	avcodec_parameters_from_context(stream->codecpar, context.get());
 	// note: this is only a hint, actual stream time_base can be different
 	// avformat_write_header will set the final stream time_base

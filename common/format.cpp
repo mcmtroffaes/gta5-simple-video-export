@@ -15,14 +15,14 @@ Format::Format(
 	av_dump_format(context.get(), 0, c_filename, 1);
 	// none of the above functions should set context to null, but just in case...
 	if (!context)
-		LOG_THROW(std::runtime_error, fmt::format("output context lost"));
+		throw std::runtime_error(fmt::format("output context lost"));
 	int ret = avio_open(&context->pb, c_filename, AVIO_FLAG_WRITE);
 	if (ret < 0 || !context->pb)
-		LOG_THROW(std::runtime_error, fmt::format("failed to open '{}' for writing: {}", filename.string(), AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to open '{}' for writing: {}", filename.string(), AVErrorString(ret)));
 	if (!(context->oformat->flags & AVFMT_NOFILE)) {
 		ret = avformat_write_header(context.get(), NULL);
 		if (ret < 0)
-			LOG_THROW(std::runtime_error, fmt::format("failed to write header: {}", AVErrorString(ret)));
+			throw std::runtime_error(fmt::format("failed to write header: {}", AVErrorString(ret)));
 	}
 	LOG_EXIT_METHOD;
 }
@@ -34,7 +34,7 @@ void Format::Flush()
 	astream.Transcode(nullptr);
 	int ret = av_write_trailer(context.get());
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to write trailer: {}", AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to write trailer: {}", AVErrorString(ret)));
 	LOG_EXIT_METHOD;
 }
 

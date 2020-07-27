@@ -8,9 +8,9 @@ AVFormatContextPtr CreateAVFormatContext(const std::filesystem::path& filename) 
 	auto c_filename{ reinterpret_cast<const char*>(u8_filename.c_str()) };
 	auto ret{ avformat_alloc_output_context2(&context, nullptr, nullptr, c_filename) };
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}': {}", c_filename, AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to allocate output context for '{}': {}", c_filename, AVErrorString(ret)));
 	if (!context)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate output context for '{}'", c_filename));
+		throw std::runtime_error(fmt::format("failed to allocate output context for '{}'", c_filename));
 	LOG_EXIT;
 	return AVFormatContextPtr{ context };
 }
@@ -26,7 +26,7 @@ AVCodecPtr CreateAVCodec(const AVCodecID& codec_id) {
 	LOG_ENTER;
 	auto codec = avcodec_find_encoder(codec_id);
 	if (!codec)
-		LOG_THROW(std::invalid_argument, fmt::format("failed find codec with id {}", codec_id));
+		throw std::invalid_argument(fmt::format("failed find codec with id {}", codec_id));
 	LOG_EXIT;
 	return codec;
 }
@@ -35,7 +35,7 @@ AVStreamPtr CreateAVStream(AVFormatContext& format_context, const AVCodec& codec
 	LOG_ENTER;
 	auto stream = avformat_new_stream(&format_context, &codec);
 	if (!stream)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate stream for {} codec", codec.name));
+		throw std::runtime_error(fmt::format("failed to allocate stream for {} codec", codec.name));
 	LOG_EXIT;
 	return AVStreamPtr{ stream };
 }
@@ -48,7 +48,7 @@ AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec) {
 	LOG_ENTER;
 	auto context = avcodec_alloc_context3(&codec);
 	if (!context)
-		LOG_THROW(std::runtime_error, fmt::format("failed to allocate context for {} codec", codec.name));
+		throw std::runtime_error(fmt::format("failed to allocate context for {} codec", codec.name));
 	LOG_EXIT;
 	return AVCodecContextPtr{ context };
 }
@@ -63,7 +63,7 @@ AVFramePtr CreateAVFrame() {
 	LOG_ENTER;
 	auto frame = av_frame_alloc();
 	if (!frame)
-		LOG_THROW(std::runtime_error, "failed to allocate frame");
+		throw std::runtime_error("failed to allocate frame");
 	frame->pts = 0;
 	LOG_EXIT;
 	return AVFramePtr{ frame };
@@ -86,10 +86,10 @@ SwrContextPtr CreateSwrContext(
 		in_channel_layout, in_sample_fmt, in_sample_rate,
 		0, NULL);
 	if (!swr)
-		LOG_THROW(std::runtime_error, "failed to allocate resampling context");
+		throw std::runtime_error("failed to allocate resampling context");
 	int ret = swr_init(swr);
 	if (ret < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to initialize resampling context: {}", AVErrorString(ret)));
+		throw std::runtime_error(fmt::format("failed to initialize resampling context: {}", AVErrorString(ret)));
 	LOG_EXIT;
 	return SwrContextPtr{ swr };
 }
@@ -107,7 +107,7 @@ SwsContextPtr CreateSwsContext(int srcW, int srcH, AVPixelFormat srcFormat, int 
 		dstW, dstH, dstFormat,
 		flags, nullptr, nullptr, nullptr);
 	if (!sws)
-		LOG_THROW(std::runtime_error, "failed to initialize pixel conversion context");
+		throw std::runtime_error("failed to initialize pixel conversion context");
 	LOG_EXIT;
 	return SwsContextPtr{ sws };
 }
@@ -122,7 +122,7 @@ AVAudioFifoPtr CreateAVAudioFifo(AVSampleFormat sample_fmt, int channels, int nb
 	LOG_ENTER;
 	auto fifo = av_audio_fifo_alloc(sample_fmt, channels, nb_samples);
 	if (!fifo)
-		LOG_THROW(std::runtime_error, "failed to allocate audio buffer");
+		throw std::runtime_error("failed to allocate audio buffer");
 	LOG_EXIT;
 	return AVAudioFifoPtr{ fifo };
 }

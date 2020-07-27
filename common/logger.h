@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdexcept>
+#include <system_error>
+
 #ifdef _WIN32
 #define SPDLOG_WCHAR_TO_UTF8_SUPPORT
 #endif
@@ -30,4 +33,5 @@ std::string AVErrorString(int errnum);
 #define LOG_EXIT LOG->trace("{}: exit", __func__)
 #define LOG_ENTER_METHOD LOG->trace("{}::{}: enter", typeid(*this).name(), __func__)
 #define LOG_EXIT_METHOD LOG->trace("{}::{}: exit", typeid(*this).name(), __func__)
-#define LOG_THROW(EXC, MSG) { LOG->critical(MSG); throw EXC(MSG); }
+#define THROW_FAILED(hrcall) { HRESULT hr = S_OK; if (FAILED(hr = (hrcall))) throw std::runtime_error(std::system_category().message(hr)); };
+#define LOG_CATCH catch (std::exception & e) { LOG->critical(e.what()); }

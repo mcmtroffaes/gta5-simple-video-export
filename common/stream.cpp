@@ -36,11 +36,11 @@ void Stream::Encode(const AVFramePtr& frame)
 	// send frame for encoding
 	int ret_frame = avcodec_send_frame(context.get(), frame.get());
 	if (ret_frame < 0)
-		LOG_THROW(std::runtime_error, fmt::format("failed to send frame to encoder: {}", AVErrorString(ret_frame)));
+		throw std::runtime_error(fmt::format("failed to send frame to encoder: {}", AVErrorString(ret_frame)));
 	// lock the format context (we will need it to write the packets)
 	auto format_context = owner.lock();
 	if (!format_context)
-		LOG_THROW(std::runtime_error, "failed to lock format context");
+		throw std::runtime_error("failed to lock format context");
 	// get next packet from encoder
 	int ret_packet = avcodec_receive_packet(context.get(), &pkt);
 	// ret_packet == 0 denotes success, keep writing as long as we have success
@@ -59,13 +59,13 @@ void Stream::Encode(const AVFramePtr& frame)
 			pkt.stream_index);
 		int ret_write = av_interleaved_write_frame(format_context.get(), &pkt);
 		if (ret_write < 0)
-			LOG_THROW(std::runtime_error, fmt::format("failed to write packet to stream: {}", AVErrorString(ret_write)));
+			throw std::runtime_error(fmt::format("failed to write packet to stream: {}", AVErrorString(ret_write)));
 		// clean up reference
 		av_packet_unref(&pkt);
 		// get next packet from encoder
 		ret_packet = avcodec_receive_packet(context.get(), &pkt);
 	}
 	if (ret_packet != AVERROR(EAGAIN) && (ret_packet != AVERROR_EOF))
-		LOG_THROW(std::runtime_error, fmt::format("failed to receive packet from encoder: {}", AVErrorString(ret_packet)));
+		throw std::runtime_error(fmt::format("failed to receive packet from encoder: {}", AVErrorString(ret_packet)));
 	LOG_EXIT_METHOD;
 }
