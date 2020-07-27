@@ -93,28 +93,22 @@ STDAPI SinkWriterSetInputMediaType(
 	IMFAttributes *pEncodingParameters)
 {
 	LOG_ENTER;
-	if (!setinputmediatype_hook) {
-		LOG->error("IMFSinkWriter::SetInputMediaType hook not set up");
-		LOG_EXIT;
-		return E_FAIL;
-	}
-	auto original_func = setinputmediatype_hook->GetOriginal<decltype(&SinkWriterSetInputMediaType)>();
-	LOG->trace("IMFSinkWriter::SetInputMediaType: enter");
-	auto hr = original_func(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
-	LOG->trace("IMFSinkWriter::SetInputMediaType: exit {}", hr);
-	if (SUCCEEDED(hr)) {
+	auto hr = E_FAIL;
+	try {
+		if (!setinputmediatype_hook) {
+			throw std::runtime_error("IMFSinkWriter::SetInputMediaType hook not set up");
+		}
+		auto original_func = setinputmediatype_hook->GetOriginal<decltype(&SinkWriterSetInputMediaType)>();
+		LOG->trace("IMFSinkWriter::SetInputMediaType: enter");
+		hr = original_func(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
+		LOG->trace("IMFSinkWriter::SetInputMediaType: exit {}", hr);
+		THROW_FAILED(hr);
 		GUID major_type = { 0 };
-		auto hr2 = pInputMediaType ? S_OK : E_FAIL;
-		if (FAILED(hr2)) {
-			LOG->error("input media type pointer is null");
+		if (!pInputMediaType) {
+			throw std::runtime_error("input media type pointer is null");
 		}
-		else {
-			hr2 = pInputMediaType->GetMajorType(&major_type);
-		}
-		if (FAILED(hr2)) {
-			LOG->error("failed to get major type for stream at index {}", dwStreamIndex);
-		}
-		else if (major_type == MFMediaType_Audio) {
+		THROW_FAILED(pInputMediaType->GetMajorType(&major_type));
+		if (major_type == MFMediaType_Audio) {
 			audio_info = std::make_unique<AudioInfo>(dwStreamIndex, *pInputMediaType);
 		}
 		else if (major_type == MFMediaType_Video) {
@@ -124,6 +118,7 @@ STDAPI SinkWriterSetInputMediaType(
 			LOG->debug("unknown stream at index {}", dwStreamIndex);
 		}
 	}
+	LOG_CATCH;
 	LOG_EXIT;
 	return hr;
 }
@@ -132,21 +127,31 @@ STDAPI SinkWriterBeginWriting(
 	IMFSinkWriter *pThis)
 {
 	LOG_ENTER;
-	if (!beginwriting_hook) {
-		LOG->error("IMFSinkWriter::BeginWriting hook not set up");
-		return E_FAIL;
+	auto hr = E_FAIL;
+	try {
+		if (!beginwriting_hook) {
+			throw std::runtime_error("IMFSinkWriter::BeginWriting hook not set up");
+		}
+		auto original_func = beginwriting_hook->GetOriginal<decltype(&SinkWriterBeginWriting)>();
+		LOG->trace("IMFSinkWriter::BeginWriting: enter");
+		hr = original_func(pThis);
+		LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
+		THROW_FAILED(hr);
 	}
-	auto original_func = beginwriting_hook->GetOriginal<decltype(&SinkWriterBeginWriting)>();
-	LOG->trace("IMFSinkWriter::BeginWriting: enter");
-	auto hr = original_func(pThis);
-	LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
-	if (settings && audio_info && video_info) {
-		std::lock_guard<std::mutex> lock(format_mutex);
-		format = std::make_unique<Format>(
-			settings->export_filename,
-			settings->video_codec_id, settings->video_codec_options, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
-			settings->audio_codec_id, settings->audio_codec_options, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
+	LOG_CATCH;
+	try {
+		if (settings && audio_info && video_info) {
+			std::lock_guard<std::mutex> lock(format_mutex);
+			format = std::make_unique<Format>(
+				settings->export_filename,
+				settings->video_codec_id, settings->video_codec_options, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
+				settings->audio_codec_id, settings->audio_codec_options, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
+		}
+		else {
+			throw std::runtime_error("cannot initialize format: missing settings or info structures");
+		}
 	}
+	LOG_CATCH;
 	LOG_EXIT;
 	return hr;
 }
@@ -157,17 +162,16 @@ STDAPI SinkWriterWriteSample(
 	IMFSample     *pSample)
 {
 	LOG_ENTER;
-	// write our audio or video sample; note: this will clear the sample as well
-	ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
-	BYTE *p_buffer = nullptr;
-	DWORD buffer_length = 0;
-	auto hr = pSample->ConvertToContiguousBuffer(p_media_buffer.GetAddressOf());
-	if (SUCCEEDED(hr))
-	{
-		hr = p_media_buffer->Lock(&p_buffer, NULL, &buffer_length);
-	}
-	if (SUCCEEDED(hr))
-	{
+	try {
+		// write our audio or video sample; note: this will clear the sample as well
+		if (!format) {
+			throw std::runtime_error("format not initialized");
+		}
+		ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
+		BYTE* p_buffer = nullptr;
+		DWORD buffer_length = 0;
+		THROW_FAILED(pSample->ConvertToContiguousBuffer(p_media_buffer.GetAddressOf()));
+		THROW_FAILED(p_media_buffer->Lock(&p_buffer, NULL, &buffer_length));
 		if (audio_info && dwStreamIndex == audio_info->stream_index) {
 			LOG->debug("transcoding {} bytes to audio stream", buffer_length);
 			int bytes_per_sample = av_get_bytes_per_sample(audio_info->sample_fmt);
@@ -200,17 +204,23 @@ STDAPI SinkWriterWriteSample(
 			}
 		}
 		memset(p_buffer, 0, buffer_length); // clear sample so game will output blank video/audio
-		hr = p_media_buffer->Unlock();
+		THROW_FAILED(p_media_buffer->Unlock());
 	}
-	// call original function
-	if (!writesample_hook) {
-		LOG->error("IMFSinkWriter::WriteSample hook not set up");
-		return E_FAIL;
+	LOG_CATCH;
+	auto hr = E_FAIL;
+	try {
+		// call original function
+		if (!writesample_hook) {
+			LOG->error("IMFSinkWriter::WriteSample hook not set up");
+			return E_FAIL;
+		}
+		auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
+		LOG->trace("IMFSinkWriter::WriteSample: enter");
+		hr = original_func(pThis, dwStreamIndex, pSample);
+		LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
+		THROW_FAILED(hr);
 	}
-	auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
-	LOG->trace("IMFSinkWriter::WriteSample: enter");
-	hr = original_func(pThis, dwStreamIndex, pSample);
-	LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
+	LOG_CATCH;
 	LOG_EXIT;
 	return hr;
 }
@@ -221,7 +231,7 @@ STDAPI SinkWriterFlush(
 {
 	LOG_ENTER;
 	LOG->info("flushing transcoder");
-	{
+	if (format) {
 		std::lock_guard<std::mutex> lock(format_mutex);
 		format->Flush();
 		format = nullptr;
@@ -246,7 +256,7 @@ STDAPI SinkWriterFinalize(
 {
 	LOG_ENTER;
 	LOG->info("flushing transcoder");
-	{
+	if (format) {
 		std::lock_guard<std::mutex> lock(format_mutex);
 		format->Flush();
 		format = nullptr;

@@ -33,5 +33,5 @@ std::string AVErrorString(int errnum);
 #define LOG_EXIT LOG->trace("{}: exit", __func__)
 #define LOG_ENTER_METHOD LOG->trace("{}::{}: enter", typeid(*this).name(), __func__)
 #define LOG_EXIT_METHOD LOG->trace("{}::{}: exit", typeid(*this).name(), __func__)
-#define THROW_FAILED(hrcall) { HRESULT hr = S_OK; if (FAILED(hr = (hrcall))) throw std::runtime_error(std::system_category().message(hr)); };
+#define THROW_FAILED(hrcall) { HRESULT _hr = S_OK; if (FAILED(_hr = (hrcall))) throw std::runtime_error(std::system_category().message(_hr)); };
 #define LOG_CATCH catch (std::exception & e) { LOG->critical(e.what()); }
