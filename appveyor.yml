@@ -1,10 +1,9 @@
 image: Visual Studio 2019
 version: 1.0.{build}
-install:
-  - git submodule update --init --recursive
 platform: x64
 configuration: Release
 install:
+  - git submodule update --init --recursive
   - set VCPKG_DEFAULT_TRIPLET=x64-windows-static-md
   - vcpkg integrate install
   - vcpkg install polyhook2
@@ -19,7 +18,7 @@ after_build:
   - ps: Copy-Item -Path "..\..\plugin\*.ini" -Destination .
   - ps: Copy-Item -Path "..\..\test\*.ini" -Destination .
   - dir /s /b *.asi *.exe *.ini
-  - 7z a -r ..\..\..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
+  - 7z a -r ..\..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
 test: off
 artifacts:
   - path: SimpleVideoExport-git-$(APPVEYOR_BUILD_VERSION).7z
