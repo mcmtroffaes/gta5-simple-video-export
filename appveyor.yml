@@ -29,9 +29,7 @@ build_script:
   - cd build
   - cmake -DCMAKE_BUILD_TYPE=RELEASE -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/Tools/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md ..
   - ninja
-  - dir /s /b
 after_build:
-  - pushd build\
   - ps: Copy-Item -Path "..\plugin\*.ini" -Destination .
   - ps: Copy-Item -Path "..\test\*.ini" -Destination .
   - dir /s /b *.asi *.exe *.ini

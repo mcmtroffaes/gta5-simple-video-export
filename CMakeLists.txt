@@ -15,12 +15,12 @@ include_directories("${PROJECT_SOURCE_DIR}/plugin")
 
 add_subdirectory(common)
 
-add_executable(simple_video_export_test test/test.cpp)
-target_link_libraries(simple_video_export_test PRIVATE common)
-target_link_libraries(simple_video_export_test PRIVATE ${FFMPEG_LIBRARIES})
-target_include_directories(simple_video_export_test PRIVATE ${FFMPEG_INCLUDE_DIRS})
-target_link_libraries(simple_video_export_test PRIVATE ${VPX_LIBRARY})
-target_include_directories(simple_video_export_test PRIVATE ${VPX_INCLUDE_DIR})
+add_executable(SimpleVideoExportTest test/test.cpp)
+target_link_libraries(SimpleVideoExportTest PRIVATE common)
+target_link_libraries(SimpleVideoExportTest PRIVATE ${FFMPEG_LIBRARIES})
+target_include_directories(SimpleVideoExportTest PRIVATE ${FFMPEG_INCLUDE_DIRS})
+target_link_libraries(SimpleVideoExportTest PRIVATE ${VPX_LIBRARY})
+target_include_directories(SimpleVideoExportTest PRIVATE ${VPX_INCLUDE_DIR})
 
 add_library(SimpleVideoExport SHARED
   plugin/dllmain.cpp
