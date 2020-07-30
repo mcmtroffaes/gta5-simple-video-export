@@ -2,17 +2,25 @@ image: Visual Studio 2019
 version: 1.0.{build}
 install:
   - git submodule update --init --recursive
-  - nuget restore
 platform: x64
 configuration: Release
-build:
-  project: gta5-simple-video-export.sln
+install:
+  - set VCPKG_DEFAULT_TRIPLET=x64-windows-static-md
+  - vcpkg integrate install
+  - vcpkg install polyhook2
+  - vcpkg install ffmpeg[vpx]
+build-script:
+  - mkdir build
+  - cd build
+  - cmake -DCMAKE_BUILD_TYPE=RELEASE -G Ninja ..
+  - ninja
 after_build:
-  - pushd x64\Release
+  - pushd build\x64-Release\
   - ps: Copy-Item -Path "..\..\plugin\*.ini" -Destination .
   - ps: Copy-Item -Path "..\..\test\*.ini" -Destination .
   - dir /s /b *.asi *.exe *.ini
-  - 7z a -r ..\..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
+  - 7z a -r ..\..\..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
 test: off
 artifacts:
   - path: SimpleVideoExport-git-$(APPVEYOR_BUILD_VERSION).7z
+cache: c:\tools\vcpkg\installed\
