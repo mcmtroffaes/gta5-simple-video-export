@@ -7,7 +7,7 @@ install:
   - set VCPKG_DEFAULT_TRIPLET=x64-windows-static-md
   - set VCPKG_BUILD_TYPE=Release
   - vcpkg integrate install
-  - vcpkg install polyhook2
+  - vcpkg install polyhook2[core,pe,virtuals]
   - vcpkg install ffmpeg[vpx]
 build_script:
   - mkdir build
