@@ -5,6 +5,7 @@ configuration: Release
 install:
   - git submodule update --init --recursive
   - set VCPKG_DEFAULT_TRIPLET=x64-windows-static-md
+  - set VCPKG_BUILD_TYPE=Release
   - vcpkg integrate install
   - vcpkg install polyhook2
   - vcpkg install ffmpeg[vpx]
