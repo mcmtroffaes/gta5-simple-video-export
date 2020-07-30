@@ -17,6 +17,8 @@ install:
   - ps: Copy-Item -Path "vcpkg_acquire_msys.cmake" -Destination "c:\tools\vcpkg\scripts\cmake\"
   # force release build type (disables debug builds)
   - echo.set(VCPKG_BUILD_TYPE release)>> C:\Tools\vcpkg\triplets\community\x64-windows-static-md.cmake
+  # set up visual studio prompt
+  - call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
   # install dependencies
   - vcpkg integrate install
   - vcpkg install spdlog
@@ -27,12 +29,13 @@ build_script:
   - cd build
   - cmake -DCMAKE_BUILD_TYPE=RELEASE -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/Tools/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md ..
   - ninja
+  - dir /s /b
 after_build:
-  - pushd build\x64-Release\
-  - ps: Copy-Item -Path "..\..\plugin\*.ini" -Destination .
-  - ps: Copy-Item -Path "..\..\test\*.ini" -Destination .
+  - pushd build\
+  - ps: Copy-Item -Path "..\plugin\*.ini" -Destination .
+  - ps: Copy-Item -Path "..\test\*.ini" -Destination .
   - dir /s /b *.asi *.exe *.ini
-  - 7z a -r ..\..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
+  - 7z a -r ..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
 test: off
 artifacts:
   - path: SimpleVideoExport-git-$(APPVEYOR_BUILD_VERSION).7z
