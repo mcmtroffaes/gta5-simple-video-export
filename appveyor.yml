@@ -9,7 +9,7 @@ install:
   - vcpkg integrate install
   - vcpkg install polyhook2
   - vcpkg install ffmpeg[vpx]
-build-script:
+build_script:
   - mkdir build
   - cd build
   - cmake -DCMAKE_BUILD_TYPE=RELEASE -G Ninja ..
