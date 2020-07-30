@@ -3,7 +3,6 @@
 #include "logger.h"
 #include <polyhook2/ErrorLog.hpp>
 #include <polyhook2/PE/IatHook.hpp>
-#include <polyhook2/Virtuals/VFuncSwapHook.hpp>
 #include <polyhook2/Virtuals/VTableSwapHook.hpp>
 
 #include <tuple>
@@ -97,16 +96,6 @@ void log_vfunc_map(const PLH::VFuncMap& map)
 {
 	for (auto&& [first, second] : map) {
 		logger->trace("virtual method {} -> {:#x}", first, second);
-	}
-}
-
-template<typename ... FuncPtrs>
-void log_vfunc_tuple(uint16_t index, const std::tuple<FuncPtrs ...>& tup)
-{
-	for (auto&& func : tup) {
-		if (func != nullptr) {
-			logger->trace("virtual method {} -> {:#x}", index++, reinterpret_cast<uint64_t>(func));
-		}
 	}
 }
 
