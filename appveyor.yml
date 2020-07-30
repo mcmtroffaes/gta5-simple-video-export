@@ -7,7 +7,7 @@ environment:
   VCPKG_BUILD_TYPE: Release
 install:
   - git submodule update --init --recursive
-  - Copy-Item -Path "vcpkg_acquire_msys.cmake" -Destination "c:\tools\vcpkg\scripts\cmake\"
+  - ps: Copy-Item -Path "vcpkg_acquire_msys.cmake" -Destination "c:\tools\vcpkg\scripts\cmake\"
   - vcpkg integrate install
   - vcpkg install polyhook2[core,pe,virtuals]
   - vcpkg install ffmpeg[vpx]
