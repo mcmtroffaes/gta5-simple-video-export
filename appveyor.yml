@@ -5,17 +5,18 @@ configuration: Release
 environment:
   VCPKG_DEFAULT_TRIPLET: x64-windows-static-md
 install:
-  - git submodule update --init --recursive
-  # fix msys issue on appveyor
-  - ps: Copy-Item -Path "vcpkg_acquire_msys.cmake" -Destination "c:\tools\vcpkg\scripts\cmake\"
-  # force release build type (disables debug builds)
-  - echo.set(VCPKG_BUILD_TYPE release)>> C:\Tools\vcpkg\triplets\community\x64-windows-static-md.cmake
   # checkout specific vcpkg version, latest master has zlib install bug
   - cd c:\tools\vcpkg\
   - git fetch
   - git checkout 077c0746be3773fdd443af52cbe5c3cc26379a15
   - .\bootstrap-vcpkg.bat -disableMetrics
   - cd %APPVEYOR_BUILD_FOLDER%
+  # get all submodules
+  - git submodule update --init --recursive
+  # fix msys issue on appveyor
+  - ps: Copy-Item -Path "vcpkg_acquire_msys.cmake" -Destination "c:\tools\vcpkg\scripts\cmake\"
+  # force release build type (disables debug builds)
+  - echo.set(VCPKG_BUILD_TYPE release)>> C:\Tools\vcpkg\triplets\community\x64-windows-static-md.cmake
   # install dependencies
   - vcpkg integrate install
   - vcpkg install polyhook2[core,pe,virtuals]
