@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 2.6)
 project(SimpleVideoExport)
 set(CMAKE_CXX_STANDARD 17)
 
+find_package(spdlog CONFIG REQUIRED)
 find_package(ffmpeg REQUIRED)
 find_library(VPX_LIBRARY NAMES vpxmd)
 find_path(VPX_INCLUDE_DIR NAMES vpx/vpx_codec.h)
