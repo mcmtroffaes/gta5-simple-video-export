@@ -3,7 +3,7 @@
 #include "avcreate.h"
 #include "logger.h"
 #include <filesystem>
-#include <inipp.h>
+#include "..\inipp\inipp\inipp.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>

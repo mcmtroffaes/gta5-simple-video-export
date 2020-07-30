@@ -97,6 +97,7 @@ Settings::Settings()
 		logger->flush_on(flush_on);
 	}
 	AVLogSetLevel(level);
+	PLHLogSetLevel(level);
 	LOG_ENTER_METHOD;
 	Section & builtinsec = sections["builtin"];
 	auto timestamp = TimeStamp();

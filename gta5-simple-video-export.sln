@@ -5,11 +5,8 @@ VisualStudioVersion = 16.0.28803.156
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "plugin", "plugin\plugin.vcxproj", "{2D6CDF29-CC49-433A-BCB4-BAA073F076F8}"
 	ProjectSection(ProjectDependencies) = postProject
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7} = {5B01D900-2359-44CA-9914-6B0C6AFB7BE7}
 		{A9E7F931-C240-4215-95D2-71EEF0980B39} = {A9E7F931-C240-4215-95D2-71EEF0980B39}
 	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "capstone_static", "capstone-project\capstone_static.vcxproj", "{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test.vcxproj", "{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -34,14 +31,6 @@ Global
 		{2D6CDF29-CC49-433A-BCB4-BAA073F076F8}.Release|x64.Build.0 = Release|x64
 		{2D6CDF29-CC49-433A-BCB4-BAA073F076F8}.Release|x86.ActiveCfg = Release|Win32
 		{2D6CDF29-CC49-433A-BCB4-BAA073F076F8}.Release|x86.Build.0 = Release|Win32
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Debug|x64.ActiveCfg = Debug|x64
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Debug|x64.Build.0 = Debug|x64
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Debug|x86.ActiveCfg = Debug|Win32
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Debug|x86.Build.0 = Debug|Win32
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Release|x64.ActiveCfg = Release|x64
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Release|x64.Build.0 = Release|x64
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Release|x86.ActiveCfg = Release|Win32
-		{5B01D900-2359-44CA-9914-6B0C6AFB7BE7}.Release|x86.Build.0 = Release|Win32
 		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Debug|x64.ActiveCfg = Debug|x64
 		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Debug|x64.Build.0 = Debug|x64
 		{F1A830EE-9935-4CD0-B5B9-A4933D4C41B6}.Debug|x86.ActiveCfg = Debug|Win32

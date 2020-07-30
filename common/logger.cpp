@@ -7,6 +7,8 @@ extern "C" {
 #include <libavutil/log.h>
 }
 
+#include <polyhook2/ErrorLog.hpp>
+
 std::istream & operator >> (std::istream & is, spdlog::level::level_enum & value)
 {
 	std::string value_str;
@@ -115,9 +117,7 @@ void AVLogCallback(void* avcl, int level, const char* fmt, va_list vl)
 
 void AVLogSetLevel(spdlog::level::level_enum level)
 {
-	if (logger) {
-		av_log_set_level(spdlog_av_level(level));
-	}
+	av_log_set_level(spdlog_av_level(level));
 }
 
 void AVLogSetCallback()
@@ -129,4 +129,51 @@ std::string AVErrorString(int errnum) {
 	char buffer[AV_ERROR_MAX_STRING_SIZE] = { 0 };
 	av_make_error_string(buffer, sizeof(buffer), errnum);
 	return std::string(buffer);
+}
+
+auto plh_spdlog_level(PLH::ErrorLevel level) {
+	switch (level) {
+	case PLH::ErrorLevel::INFO:
+		return spdlog::level::info;
+	case PLH::ErrorLevel::WARN:
+		return spdlog::level::warn;
+	case PLH::ErrorLevel::SEV:
+		return spdlog::level::err;
+	case PLH::ErrorLevel::NONE:
+		return spdlog::level::off;
+	default:
+		return spdlog::level::info;
+	}
+}
+
+auto spdlog_plh_level(spdlog::level::level_enum level) {
+	switch (level) {
+	case spdlog::level::trace:
+	case spdlog::level::debug:
+	case spdlog::level::info:
+		return PLH::ErrorLevel::INFO;
+	case spdlog::level::warn:
+		return PLH::ErrorLevel::WARN;
+	case spdlog::level::err:
+	case spdlog::level::critical:
+		return PLH::ErrorLevel::SEV;
+	case spdlog::level::off:
+		return PLH::ErrorLevel::NONE;
+	default:
+		return PLH::ErrorLevel::INFO;
+	}
+}
+
+void PLHLogSetLevel(spdlog::level::level_enum level)
+{
+	PLH::ErrorLog::singleton().setLogLevel(spdlog_plh_level(level));
+}
+
+void PLHLog()
+{
+	auto err = PLH::ErrorLog::singleton().pop();
+	while (!err.msg.empty()) {
+		LOG->log(plh_spdlog_level(err.lvl), err.msg);
+		err = PLH::ErrorLog::singleton().pop();
+	}
 }

@@ -50,12 +50,14 @@ extern "C" {
 
 using namespace Microsoft::WRL;
 
-std::unique_ptr<PLH::IATHook> sinkwriter_hook = nullptr;
-std::unique_ptr<PLH::VFuncDetour> setinputmediatype_hook = nullptr;
-std::unique_ptr<PLH::VFuncDetour> beginwriting_hook = nullptr;
-std::unique_ptr<PLH::VFuncDetour> writesample_hook = nullptr;
-std::unique_ptr<PLH::VFuncDetour> flush_hook = nullptr;
-std::unique_ptr<PLH::VFuncDetour> finalize_hook = nullptr;
+std::unique_ptr<IatHook<decltype(&CreateSinkWriterFromURL)>> create_sinkwriter_hook = nullptr;
+std::unique_ptr<VTableSwapHook<
+	IMFSinkWriter,
+	VFunc<4, decltype(&SinkWriterSetInputMediaType)>,
+	VFunc<5, decltype(&SinkWriterBeginWriting)>,
+	VFunc<6, decltype(&SinkWriterWriteSample)>,
+	VFunc<10, decltype(&SinkWriterFlush)>,
+	VFunc<11, decltype(&SinkWriterFinalize)>>> sinkwriter_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
 std::unique_ptr<Format> format = nullptr;
@@ -64,11 +66,7 @@ std::mutex format_mutex;
 void UnhookVFuncDetours()
 {
 	LOG_ENTER;
-	setinputmediatype_hook = nullptr;
-	beginwriting_hook = nullptr;
-	writesample_hook = nullptr;
-	flush_hook = nullptr;
-	finalize_hook = nullptr;
+	sinkwriter_hook = nullptr;
 	audio_info = nullptr;
 	video_info = nullptr;
 	{
@@ -82,7 +80,7 @@ void Unhook()
 {
 	LOG_ENTER;
 	UnhookVFuncDetours();
-	sinkwriter_hook = nullptr;
+	create_sinkwriter_hook = nullptr;
 	LOG_EXIT;
 }
 
@@ -95,13 +93,9 @@ STDAPI SinkWriterSetInputMediaType(
 	LOG_ENTER;
 	auto hr = E_FAIL;
 	try {
-		if (!setinputmediatype_hook) {
-			throw std::runtime_error("IMFSinkWriter::SetInputMediaType hook not set up");
-		}
-		auto original_func = setinputmediatype_hook->GetOriginal<decltype(&SinkWriterSetInputMediaType)>();
-		LOG->trace("IMFSinkWriter::SetInputMediaType: enter");
-		hr = original_func(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
-		LOG->trace("IMFSinkWriter::SetInputMediaType: exit {}", hr);
+		if (!sinkwriter_hook)
+			throw std::runtime_error("IMFSinkWriter hook not set up");
+		hr = sinkwriter_hook->origFunc<0>(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
 		THROW_FAILED(hr);
 		GUID major_type = { 0 };
 		if (!pInputMediaType) {
@@ -129,13 +123,9 @@ STDAPI SinkWriterBeginWriting(
 	LOG_ENTER;
 	auto hr = E_FAIL;
 	try {
-		if (!beginwriting_hook) {
-			throw std::runtime_error("IMFSinkWriter::BeginWriting hook not set up");
-		}
-		auto original_func = beginwriting_hook->GetOriginal<decltype(&SinkWriterBeginWriting)>();
-		LOG->trace("IMFSinkWriter::BeginWriting: enter");
-		hr = original_func(pThis);
-		LOG->trace("IMFSinkWriter::BeginWriting: exit {}", hr);
+		if (!sinkwriter_hook)
+			throw std::runtime_error("IMFSinkWriter hook not set up");
+		hr = sinkwriter_hook->origFunc<1>(pThis);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -210,14 +200,9 @@ STDAPI SinkWriterWriteSample(
 	auto hr = E_FAIL;
 	try {
 		// call original function
-		if (!writesample_hook) {
-			LOG->error("IMFSinkWriter::WriteSample hook not set up");
-			return E_FAIL;
-		}
-		auto original_func = writesample_hook->GetOriginal<decltype(&SinkWriterWriteSample)>();
-		LOG->trace("IMFSinkWriter::WriteSample: enter");
-		hr = original_func(pThis, dwStreamIndex, pSample);
-		LOG->trace("IMFSinkWriter::WriteSample: exit {}", hr);
+		if (!sinkwriter_hook)
+			throw std::runtime_error("IMFSinkWriter hook not set up");
+		hr = sinkwriter_hook->origFunc<2>(pThis, dwStreamIndex, pSample);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -230,23 +215,26 @@ STDAPI SinkWriterFlush(
 	DWORD         dwStreamIndex)
 {
 	LOG_ENTER;
-	LOG->info("flushing transcoder");
-	if (format) {
-		std::lock_guard<std::mutex> lock(format_mutex);
-		format->Flush();
-		format = nullptr;
+	try {
+		LOG->info("flushing transcoder");
+		if (format) {
+			std::lock_guard<std::mutex> lock(format_mutex);
+			format->Flush();
+			format = nullptr;
+		}
 	}
-	if (!flush_hook) {
-		LOG->error("IMFSinkWriter::Flush hook not set up");
-		return E_FAIL;
+	LOG_CATCH;
+	auto hr = E_FAIL;
+	try {
+		if (!sinkwriter_hook)
+			throw std::runtime_error("IMFSinkWriter hook not set up");
+		hr = sinkwriter_hook->origFunc<3>(pThis, dwStreamIndex);
+		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
+		UnhookVFuncDetours();
+		THROW_FAILED(hr);
+		LOG->info("export cancelled");
 	}
-	auto original_func = flush_hook->GetOriginal<decltype(&SinkWriterFlush)>();
-	LOG->trace("IMFSinkWriter::Flush: enter");
-	auto hr = original_func(pThis, dwStreamIndex);
-	LOG->trace("IMFSinkWriter::Flush: exit {}", hr);
-	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
-	UnhookVFuncDetours();
-	LOG->info("export cancelled");
+	LOG_CATCH;
 	LOG_EXIT;
 	return hr;
 }
@@ -255,23 +243,23 @@ STDAPI SinkWriterFinalize(
 	IMFSinkWriter *pThis)
 {
 	LOG_ENTER;
-	LOG->info("flushing transcoder");
-	if (format) {
-		std::lock_guard<std::mutex> lock(format_mutex);
-		format->Flush();
-		format = nullptr;
+	auto hr = E_FAIL;
+	try {
+		LOG->info("flushing transcoder");
+		if (format) {
+			std::lock_guard<std::mutex> lock(format_mutex);
+			format->Flush();
+			format = nullptr;
+		}
+		if (!sinkwriter_hook)
+			throw std::runtime_error("IMFSinkWriter hook not set up");
+		hr = sinkwriter_hook->origFunc<4>(pThis);
+		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
+		UnhookVFuncDetours();
+		THROW_FAILED(hr);
+		LOG->info("export finished");
 	}
-	if (!finalize_hook) {
-		LOG->error("IMFSinkWriter::Finalize hook not set up");
-		return E_FAIL;
-	}
-	auto original_func = finalize_hook->GetOriginal<decltype(&SinkWriterFinalize)>();
-	LOG->trace("IMFSinkWriter::Finalize: enter");
-	auto hr = original_func(pThis);
-	LOG->trace("IMFSinkWriter::Finalize: exit {}", hr);
-	/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
-	UnhookVFuncDetours();
-	LOG->info("export finished");
+	LOG_CATCH;
 	LOG_EXIT;
 	return hr;
 }
@@ -284,36 +272,47 @@ STDAPI CreateSinkWriterFromURL(
 	)
 {
 	LOG_ENTER;
-	// unhook any dangling detours
-	UnhookVFuncDetours();
-	// now start export
-	LOG->info("export started");
-	if (!sinkwriter_hook) {
-		LOG->error("MFCreateSinkWriterFromURL hook not set up");
-		LOG_EXIT;
-		return E_FAIL;
+	auto hr = E_FAIL;
+	try {
+		// unhook any dangling detours
+		UnhookVFuncDetours();
+		// now start export
+		LOG->info("export started");
+		if (!create_sinkwriter_hook) {
+			LOG->error("MFCreateSinkWriterFromURL: hook not set up");
+			LOG_EXIT;
+			return E_FAIL;
+		}
+		LOG->trace("MFCreateSinkWriterFromURL: enter");
+		hr = create_sinkwriter_hook->origFunc(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
+		LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
+		// reload settings to see if the mod is enabled, and to get the latest settings
+		settings = std::make_unique<Settings>();
+		auto enable = true;
+		auto exportsec = GetSec(settings->sections, "export");
+		GetVar(exportsec, "enable", enable);
+		if (!enable) {
+			LOG->info("mod disabled, default in-game video export will be used");
+		}
+		else if (FAILED(hr)) {
+			LOG->info("MFCreateSinkWriterFromURL failed");
+		}
+		else {
+			if (ppSinkWriter == nullptr)
+				throw std::runtime_error("ppSinkWriter is null");
+			if (*ppSinkWriter == nullptr)
+				throw std::runtime_error("*ppSinkWriter is null");
+			sinkwriter_hook = std::make_unique<decltype(sinkwriter_hook)::element_type>(
+				**ppSinkWriter,
+				make_vfunc<4>(&SinkWriterSetInputMediaType),
+				make_vfunc<5>(&SinkWriterBeginWriting),
+				make_vfunc<6>(&SinkWriterWriteSample),
+				make_vfunc<10>(&SinkWriterFlush),
+				make_vfunc<11>(&SinkWriterFinalize)
+				);
+		}
 	}
-	auto original_func = sinkwriter_hook->GetOriginal<decltype(&CreateSinkWriterFromURL)>();
-	LOG->trace("MFCreateSinkWriterFromURL: enter");
-	auto hr = original_func(pwszOutputURL, pByteStream, pAttributes, ppSinkWriter);
-	LOG->trace("MFCreateSinkWriterFromURL: exit {}", hr);
-	// reload settings to see if the mod is enabled, and to get the latest settings
-	settings = std::make_unique<Settings>();
-	auto enable = true;
-	auto exportsec = GetSec(settings->sections, "export");
-	GetVar(exportsec, "enable", enable);
-	if (!enable) {
-		LOG->info("mod disabled, default in-game video export will be used");
-	}
-	else if (FAILED(hr)) {
-		LOG->info("MFCreateSinkWriterFromURL failed");
-	} else {
-		setinputmediatype_hook = CreateVFuncDetour(*ppSinkWriter, 4, &SinkWriterSetInputMediaType);
-		beginwriting_hook = CreateVFuncDetour(*ppSinkWriter, 5, &SinkWriterBeginWriting);
-		writesample_hook = CreateVFuncDetour(*ppSinkWriter, 6, &SinkWriterWriteSample);
-		flush_hook = CreateVFuncDetour(*ppSinkWriter, 10, &SinkWriterFlush);
-		finalize_hook = CreateVFuncDetour(*ppSinkWriter, 11, &SinkWriterFinalize);
-	}
+	LOG_CATCH;
 	LOG_EXIT;
 	return hr;
 }
@@ -321,7 +320,10 @@ STDAPI CreateSinkWriterFromURL(
 void Hook()
 {
 	LOG_ENTER;
-	UnhookVFuncDetours(); // virtual functions are hooked by CreateSinkWriterFromURL
-	sinkwriter_hook = CreateIATHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL);
+	try {
+		UnhookVFuncDetours(); // virtual functions are hooked by CreateSinkWriterFromURL
+		create_sinkwriter_hook.reset(new IatHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL));
+	}
+	LOG_CATCH;
 	LOG_EXIT;
 }
