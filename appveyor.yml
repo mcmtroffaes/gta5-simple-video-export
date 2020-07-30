@@ -4,10 +4,10 @@ platform: x64
 configuration: Release
 environment:
   VCPKG_DEFAULT_TRIPLET: x64-windows-static-md
-  VCPKG_BUILD_TYPE: Release
 install:
   - git submodule update --init --recursive
   - ps: Copy-Item -Path "vcpkg_acquire_msys.cmake" -Destination "c:\tools\vcpkg\scripts\cmake\"
+  - echo.set(VCPKG_BUILD_TYPE release)>> C:\Tools\vcpkg\triplets\community\x64-windows-static-md.cmake
   - vcpkg integrate install
   - vcpkg install polyhook2[core,pe,virtuals]
   - vcpkg install ffmpeg[vpx]
