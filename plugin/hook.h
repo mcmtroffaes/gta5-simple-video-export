@@ -4,20 +4,18 @@
 #include <polyhook2/Virtuals/VTableSwapHook.hpp>
 
 template <typename FuncPtr>
-class IatHook {
+class IatHook : private PLH::IatHook {
 public:
 	IatHook(
-		const std::string& library_name_,
-		const std::string& func_name_,
-		FuncPtr new_func_ptr_
+		const std::string& library_name,
+		const std::string& func_name,
+		FuncPtr new_func
 	)
-		: func_name(func_name_)
-		, orig_func(nullptr)
-		, hook(library_name_, func_name_, reinterpret_cast<char*>(new_func_ptr_), reinterpret_cast<uint64_t*>(&orig_func), L"")
+		: orig_func(nullptr)
+		, PLH::IatHook(library_name, func_name, reinterpret_cast<char*>(new_func), reinterpret_cast<uint64_t*>(&orig_func), L"")
 	{
-		if (!hook.hook()) {
+		if (!hook())
 			throw std::runtime_error("failed to hook " + func_name);
-		}
 	}
 
 	template<typename ... Args>
@@ -28,12 +26,10 @@ public:
 	}
 
 	~IatHook() {
-		hook.unHook();
+		unHook();
 	}
 private:
-	std::string func_name;
 	FuncPtr orig_func;
-	PLH::IatHook hook;
 };
 
 // storage class for address of a virtual function
@@ -69,28 +65,26 @@ namespace detail {
 
 }
 
-template<class ClassType, typename ... Ts>
-class VTableSwapHook {
+template<class ClassType, typename ... VFuncTypes>
+class VTableSwapHook : private PLH::VTableSwapHook {
 public:
-	VTableSwapHook(ClassType& instance_, Ts ... new_funcs_)
-		: hook((char *)&instance_, detail::make_vfunc_map(new_funcs_ ...))
+	VTableSwapHook(ClassType& instance, VFuncTypes ... new_funcs)
+		: PLH::VTableSwapHook((char *)&instance, detail::make_vfunc_map(new_funcs ...))
 	{
-		if (!hook.hook())
+		if (!hook())
 			throw std::runtime_error(std::string("failed to hook ") + typeid(ClassType).name());
 	};
 
 	template<typename VFuncType, typename ... Args>
 	auto origFunc(Args && ... args) {
-		auto func = reinterpret_cast<typename VFuncType::func_type>(hook.getOriginals().at(VFuncType::func_index));
-		if (func == nullptr)
+		auto orig_func = reinterpret_cast<typename VFuncType::func_type>(getOriginals().at(VFuncType::func_index));
+		if (orig_func == nullptr)
 			throw std::runtime_error("original virtual function pointer is null");
-		return func(std::forward<Args>(args) ...);
+		return orig_func(std::forward<Args>(args) ...);
 	};
 
 	~VTableSwapHook()
 	{
-		hook.unHook();
+		unHook();
 	}
-private:
-	PLH::VTableSwapHook hook;
 };
