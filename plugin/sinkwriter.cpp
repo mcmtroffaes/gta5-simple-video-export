@@ -50,14 +50,23 @@ extern "C" {
 
 using namespace Microsoft::WRL;
 
-std::unique_ptr<IatHook<decltype(&CreateSinkWriterFromURL)>> create_sinkwriter_hook = nullptr;
-std::unique_ptr<VTableSwapHook<
+typedef VFunc<4, decltype(&SinkWriterSetInputMediaType)> VSinkWriterSetInputMediaType;
+typedef VFunc<5, decltype(&SinkWriterBeginWriting)> VSinkWriterBeginWriting;
+typedef VFunc<6, decltype(&SinkWriterWriteSample)> VSinkWriterWriteSample;
+typedef VFunc<10, decltype(&SinkWriterFlush)> VSinkWriterFlush;
+typedef VFunc<11, decltype(&SinkWriterFinalize)> VSinkWriterFinalize;
+typedef VTableSwapHook<
+	// class
 	IMFSinkWriter,
-	VFunc<4, decltype(&SinkWriterSetInputMediaType)>,
-	VFunc<5, decltype(&SinkWriterBeginWriting)>,
-	VFunc<6, decltype(&SinkWriterWriteSample)>,
-	VFunc<10, decltype(&SinkWriterFlush)>,
-	VFunc<11, decltype(&SinkWriterFinalize)>>> sinkwriter_hook = nullptr;
+	// virtual functions to be redirected
+	VSinkWriterSetInputMediaType,
+	VSinkWriterBeginWriting,
+	VSinkWriterWriteSample,
+	VSinkWriterFlush,
+	VSinkWriterFinalize> VTableSinkWriter;
+
+std::unique_ptr<IatHook<decltype(&CreateSinkWriterFromURL)>> create_sinkwriter_hook = nullptr;
+std::unique_ptr<VTableSinkWriter> sinkwriter_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
 std::unique_ptr<Format> format = nullptr;
@@ -95,7 +104,7 @@ STDAPI SinkWriterSetInputMediaType(
 	try {
 		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<0>(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
+		hr = sinkwriter_hook->origFunc<VSinkWriterSetInputMediaType>(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
 		THROW_FAILED(hr);
 		GUID major_type = { 0 };
 		if (!pInputMediaType) {
@@ -125,7 +134,7 @@ STDAPI SinkWriterBeginWriting(
 	try {
 		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<1>(pThis);
+		hr = sinkwriter_hook->origFunc<VSinkWriterBeginWriting>(pThis);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -202,7 +211,7 @@ STDAPI SinkWriterWriteSample(
 		// call original function
 		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<2>(pThis, dwStreamIndex, pSample);
+		hr = sinkwriter_hook->origFunc<VSinkWriterWriteSample>(pThis, dwStreamIndex, pSample);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -228,7 +237,7 @@ STDAPI SinkWriterFlush(
 	try {
 		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<3>(pThis, dwStreamIndex);
+		hr = sinkwriter_hook->origFunc<VSinkWriterFlush>(pThis, dwStreamIndex);
 		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 		UnhookVFuncDetours();
 		THROW_FAILED(hr);
@@ -253,7 +262,7 @@ STDAPI SinkWriterFinalize(
 		}
 		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<4>(pThis);
+		hr = sinkwriter_hook->origFunc<VSinkWriterFinalize>(pThis);
 		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 		UnhookVFuncDetours();
 		THROW_FAILED(hr);
@@ -302,13 +311,13 @@ STDAPI CreateSinkWriterFromURL(
 				throw std::runtime_error("ppSinkWriter is null");
 			if (*ppSinkWriter == nullptr)
 				throw std::runtime_error("*ppSinkWriter is null");
-			sinkwriter_hook = std::make_unique<decltype(sinkwriter_hook)::element_type>(
+			sinkwriter_hook = std::make_unique<VTableSinkWriter>(
 				**ppSinkWriter,
-				make_vfunc<4>(&SinkWriterSetInputMediaType),
-				make_vfunc<5>(&SinkWriterBeginWriting),
-				make_vfunc<6>(&SinkWriterWriteSample),
-				make_vfunc<10>(&SinkWriterFlush),
-				make_vfunc<11>(&SinkWriterFinalize)
+				VSinkWriterSetInputMediaType(&SinkWriterSetInputMediaType),
+				VSinkWriterBeginWriting(&SinkWriterBeginWriting),
+				VSinkWriterWriteSample(&SinkWriterWriteSample),
+				VSinkWriterFlush(&SinkWriterFlush),
+				VSinkWriterFinalize(&SinkWriterFinalize)
 				);
 		}
 	}
