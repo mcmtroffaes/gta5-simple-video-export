@@ -5,12 +5,6 @@ configuration: Release
 environment:
   VCPKG_DEFAULT_TRIPLET: x64-windows-static-md
 install:
-  # checkout specific vcpkg version, latest master has zlib install bug
-  - cd c:\tools\vcpkg\
-  - git fetch
-  - git checkout 077c0746be3773fdd443af52cbe5c3cc26379a15
-  - .\bootstrap-vcpkg.bat -disableMetrics
-  - cd %APPVEYOR_BUILD_FOLDER%
   # get all submodules
   - git submodule update --init --recursive
   # fix msys issue on appveyor
