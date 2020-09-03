@@ -28,14 +28,9 @@ void AVLogSetCallback();
 // convert ffmpeg errnum to std::string
 std::string AVErrorString(int errnum);
 
-// set polyhook log level
-// call this whenever you change the logger level
-void PLHLogSetLevel(spdlog::level::level_enum level);
-
-// log all messages from the polyhook error message queue
-// this needs to be called after polyhook operations
-// sadly it does not have a callback
-void PLHLog();
+// set polyhook logger callback
+// call this once at the start of your application
+void PLHLogSetCallback();
 
 #define LOG if (logger) logger
 #define LOG_ENTER LOG->trace("{}: enter", __func__)

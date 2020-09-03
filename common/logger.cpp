@@ -164,16 +164,14 @@ auto spdlog_plh_level(spdlog::level::level_enum level) {
 	}
 }
 
-void PLHLogSetLevel(spdlog::level::level_enum level)
+class PLHLogger : public PLH::Logger
 {
-	PLH::ErrorLog::singleton().setLogLevel(spdlog_plh_level(level));
-}
+	virtual void log(std::string msg, PLH::ErrorLevel level) {
+		LOG->log(plh_spdlog_level(level), msg);
+	};
+};
 
-void PLHLog()
+void PLHLogSetCallback()
 {
-	auto err = PLH::ErrorLog::singleton().pop();
-	while (!err.msg.empty()) {
-		LOG->log(plh_spdlog_level(err.lvl), err.msg);
-		err = PLH::ErrorLog::singleton().pop();
-	}
+	PLH::Log::registerLogger(std::shared_ptr<PLHLogger>());
 }

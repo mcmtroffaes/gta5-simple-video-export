@@ -36,7 +36,7 @@ all the SinkWriter hooks.
 
 #include <mutex>
 
-#include <wrl/client.h> // ComPtr
+#include <winrt/base.h> // com_ptr
 
 #include <mfapi.h>
 #include <mfplay.h>
@@ -48,17 +48,12 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 }
 
-using namespace Microsoft::WRL;
-
-typedef VFunc<4, decltype(&SinkWriterSetInputMediaType)> VSinkWriterSetInputMediaType;
-typedef VFunc<5, decltype(&SinkWriterBeginWriting)> VSinkWriterBeginWriting;
-typedef VFunc<6, decltype(&SinkWriterWriteSample)> VSinkWriterWriteSample;
-typedef VFunc<10, decltype(&SinkWriterFlush)> VSinkWriterFlush;
-typedef VFunc<11, decltype(&SinkWriterFinalize)> VSinkWriterFinalize;
+typedef PLH::VFunc<4, decltype(&SinkWriterSetInputMediaType)> VSinkWriterSetInputMediaType;
+typedef PLH::VFunc<5, decltype(&SinkWriterBeginWriting)> VSinkWriterBeginWriting;
+typedef PLH::VFunc<6, decltype(&SinkWriterWriteSample)> VSinkWriterWriteSample;
+typedef PLH::VFunc<10, decltype(&SinkWriterFlush)> VSinkWriterFlush;
+typedef PLH::VFunc<11, decltype(&SinkWriterFinalize)> VSinkWriterFinalize;
 typedef VTableSwapHook<
-	// class
-	IMFSinkWriter,
-	// virtual functions to be redirected
 	VSinkWriterSetInputMediaType,
 	VSinkWriterBeginWriting,
 	VSinkWriterWriteSample,
@@ -166,10 +161,10 @@ STDAPI SinkWriterWriteSample(
 		if (!format) {
 			throw std::runtime_error("format not initialized");
 		}
-		ComPtr<IMFMediaBuffer> p_media_buffer = nullptr;
+		winrt::com_ptr<IMFMediaBuffer> p_media_buffer = nullptr;
 		BYTE* p_buffer = nullptr;
 		DWORD buffer_length = 0;
-		THROW_FAILED(pSample->ConvertToContiguousBuffer(p_media_buffer.GetAddressOf()));
+		THROW_FAILED(pSample->ConvertToContiguousBuffer(p_media_buffer.put()));
 		THROW_FAILED(p_media_buffer->Lock(&p_buffer, NULL, &buffer_length));
 		if (audio_info && dwStreamIndex == audio_info->stream_index) {
 			LOG->debug("transcoding {} bytes to audio stream", buffer_length);
@@ -312,7 +307,7 @@ STDAPI CreateSinkWriterFromURL(
 			if (*ppSinkWriter == nullptr)
 				throw std::runtime_error("*ppSinkWriter is null");
 			sinkwriter_hook = std::make_unique<VTableSinkWriter>(
-				**ppSinkWriter,
+				static_cast<IUnknown*>(*ppSinkWriter),
 				VSinkWriterSetInputMediaType(&SinkWriterSetInputMediaType),
 				VSinkWriterBeginWriting(&SinkWriterBeginWriting),
 				VSinkWriterWriteSample(&SinkWriterWriteSample),

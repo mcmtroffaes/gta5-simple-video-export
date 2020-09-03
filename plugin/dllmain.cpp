@@ -33,6 +33,7 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 			SCRIPT_NAME, SCRIPT_NAME ".log", 10000000, 5);
 		logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%t] [%^%l%$] %v");
 		AVLogSetCallback();
+		PLHLogSetCallback();
 		/* load settings */
 		settings = std::make_unique<Settings>();
 		LOG_ENTER;
