@@ -4,7 +4,7 @@ platform: x64
 configuration: Release
 environment:
   VCPKG_DEFAULT_TRIPLET: x64-windows-static-md
-  VCPKG_HASH: ff1d20fd9a72d72d51a549c27b669cd6040fb7d9
+  VCPKG_HASH: fdac1fc5aa36e8edeb9f358f0fad041de2626215
 install:
   # get all submodules
   - git submodule update --init --recursive
