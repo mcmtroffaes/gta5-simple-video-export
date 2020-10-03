@@ -12,4 +12,4 @@ add_library(common STATIC
 target_link_libraries(common PUBLIC ${FFMPEG_LIBRARIES})
 target_include_directories(common PUBLIC ${FFMPEG_INCLUDE_DIRS})
 target_link_libraries(common PUBLIC PolyHook_2::PolyHook_2)
-target_link_libraries(common PUBLIC spdlog::spdlog spdlog::spdlog_header_only)
+target_link_libraries(common PUBLIC spdlog::spdlog)
