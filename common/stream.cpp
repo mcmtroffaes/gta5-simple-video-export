@@ -22,6 +22,8 @@ Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, const AVCodec& 
 	, context{ CreateAVCodecContext(codec) }
 {
 	LOG_ENTER_METHOD;
+	if (format_context->oformat->flags & AVFMT_GLOBALHEADER)
+		context->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 	LOG_EXIT_METHOD;
 }
 
