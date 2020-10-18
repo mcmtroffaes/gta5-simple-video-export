@@ -16,11 +16,10 @@ auto AVTsTimeString(uint64_t ts, AVRational* tb) {
 	return std::string(buffer);
 }
 
-Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id)
+Stream::Stream(std::shared_ptr<AVFormatContext>& format_context, const AVCodec& codec)
 	: owner{ format_context }
-	, codec{ CreateAVCodec(codec_id) }
-	, stream{ CreateAVStream(*format_context, *codec) }
-	, context{ CreateAVCodecContext(*codec) }
+	, stream{ CreateAVStream(*format_context, codec) }
+	, context{ CreateAVCodecContext(codec) }
 {
 	LOG_ENTER_METHOD;
 	LOG_EXIT_METHOD;

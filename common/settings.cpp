@@ -48,8 +48,9 @@ std::string TimeStamp()
 	return oss.str();
 }
 
-void ParseCodecNameOptions(const std::string& value, std::string& name, AVDictionaryPtr& options) {
+void ParseCodecNameOptions(const std::string& value, const AVCodecID codec_fallback,  AVCodecPtr& codec, AVDictionaryPtr& options) {
 	LOG_ENTER;
+	std::string name{ };
 	auto pos = value.find_first_of(' ');
 	if (pos == std::string::npos) {
 		name = value;
@@ -63,14 +64,15 @@ void ParseCodecNameOptions(const std::string& value, std::string& name, AVDictio
 		LOG->debug("codec name is {}", name);
 		LOG->debug("codec options are {}", options_string);
 	}
+	codec = CreateAVCodec(name, codec_fallback);
 	LOG_EXIT;
 }
 
 const std::filesystem::path Settings::ini_filename_ = SCRIPT_NAME ".ini";
 
 Settings::Settings()
-	: video_codec_id{ AV_CODEC_ID_NONE }
-	, audio_codec_id{ AV_CODEC_ID_NONE }
+	: video_codec{ nullptr }
+	, audio_codec{ nullptr }
 {
 	// LOG_ENTER is deferred until the log level is set
 	LOG->debug("parsing {}", ini_filename_.string());
@@ -143,28 +145,12 @@ Settings::Settings()
 	}
 	// set up valid video codec
 	std::string videocodec_value{ };
-	std::string videocodec_name{ };
 	GetVar(presetsec, "videocodec", videocodec_value);
-	ParseCodecNameOptions(videocodec_value, videocodec_name, video_codec_options);
-	auto videocodec = avcodec_find_encoder_by_name(videocodec_name.c_str());
-	auto videocodec_fallback = oformat->video_codec;
-	if (!videocodec)
-		LOG->error(
-			"video codec {} not supported, falling back to {}",
-			videocodec_name, avcodec_get_name(videocodec_fallback));
-	video_codec_id = videocodec ? videocodec->id : videocodec_fallback;
+	ParseCodecNameOptions(videocodec_value, oformat->video_codec, video_codec, video_codec_options);
 	// set up valid audio codec
 	std::string audiocodec_value{ };
-	std::string audiocodec_name{ };
 	GetVar(presetsec, "audiocodec", audiocodec_value);
-	ParseCodecNameOptions(audiocodec_value, audiocodec_name, audio_codec_options);
-	auto audiocodec = avcodec_find_encoder_by_name(audiocodec_name.c_str());
-	auto audiocodec_fallback = oformat->audio_codec;
-	if (!audiocodec)
-		LOG->error(
-			"audio codec {} not supported, falling back to {}",
-			audiocodec_name, avcodec_get_name(audiocodec_fallback));
-	audio_codec_id = audiocodec ? audiocodec->id : audiocodec_fallback;
+	ParseCodecNameOptions(audiocodec_value, oformat->audio_codec, audio_codec, audio_codec_options);
 	LOG_EXIT_METHOD;
 }
 

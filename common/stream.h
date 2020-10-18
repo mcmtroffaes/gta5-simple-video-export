@@ -22,14 +22,13 @@ extern "C" {
 class Stream {
 public:
 	std::weak_ptr<AVFormatContext> owner; // context which owns this stream
-	AVCodecPtr codec;             // the codec
 	AVStreamPtr stream;           // the stream
 	AVCodecContextPtr context;    // codec context for this stream
 
 	// add stream to the given format context, and initialize codec context and frame
 	// note: frame buffer is not allocated (we do not know the stream format yet at this point)
 	// note: frame->pts is set to zero
-	Stream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id);
+	Stream(std::shared_ptr<AVFormatContext>& format_context, const AVCodec& codec);
 
 	// send frame to the encoder
 	void Encode(const AVFramePtr& avframe);

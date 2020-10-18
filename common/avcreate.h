@@ -32,7 +32,7 @@ using AVAudioFifoPtr = std::unique_ptr<AVAudioFifo, AVAudioFifoDeleter>;
 using AVDictionaryPtr = std::unique_ptr<AVDictionary, AVDictionaryDeleter>;
 
 AVFormatContextPtr CreateAVFormatContext(const std::filesystem::path& filename);
-AVCodecPtr CreateAVCodec(const AVCodecID& codec_id);
+AVCodecPtr CreateAVCodec(const std::string& name, const AVCodecID& fallback);
 AVStreamPtr CreateAVStream(AVFormatContext& format_context, const AVCodec& codec);
 AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec);
 AVFramePtr CreateAVFrame();

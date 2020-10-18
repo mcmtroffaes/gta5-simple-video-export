@@ -138,8 +138,8 @@ STDAPI SinkWriterBeginWriting(
 			std::lock_guard<std::mutex> lock(format_mutex);
 			format = std::make_unique<Format>(
 				settings->export_filename,
-				settings->video_codec_id, settings->video_codec_options, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
-				settings->audio_codec_id, settings->audio_codec_options, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
+				*settings->video_codec, settings->video_codec_options, video_info->width, video_info->height, video_info->frame_rate, video_info->pix_fmt,
+				*settings->audio_codec, settings->audio_codec_options, audio_info->sample_fmt, audio_info->sample_rate, audio_info->channel_layout);
 		}
 		else {
 			throw std::runtime_error("cannot initialize format: missing settings or info structures");

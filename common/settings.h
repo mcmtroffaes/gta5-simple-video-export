@@ -37,9 +37,9 @@ class Settings : public inipp::Ini<char>
 public:
 	static const std::filesystem::path ini_filename_;
 	std::filesystem::path export_filename;
-	AVCodecID video_codec_id;
+	AVCodecPtr video_codec;
 	AVDictionaryPtr video_codec_options;
-	AVCodecID audio_codec_id;
+	AVCodecPtr audio_codec;
 	AVDictionaryPtr audio_codec_options;
 
 	Settings();

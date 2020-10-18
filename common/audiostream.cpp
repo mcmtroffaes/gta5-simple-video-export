@@ -89,8 +89,8 @@ auto FindBestChannelLayout(const AVCodec* codec, uint64_t channel_layout) {
 	return best_layout;
 }
 
-AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVDictionaryPtr& options, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
-	: Stream{ format_context, codec_id }
+AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, const AVCodec& codec, AVDictionaryPtr& options, AVSampleFormat sample_fmt, int sample_rate, uint64_t channel_layout)
+	: Stream{ format_context, codec }
 	, sample_fmt{ sample_fmt }, sample_rate{ sample_rate }
 	, channel_layout{ channel_layout }, channels { av_get_channel_layout_nb_channels(channel_layout) }
 	, dst_frame{ nullptr }, swr{ nullptr }, fifo{ nullptr }
@@ -102,19 +102,19 @@ AudioStream::AudioStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	if (context->sample_fmt != sample_fmt)
 		LOG->info(
 			"codec {} does not support sample format {} so transcoding to {}",
-			avcodec_get_name(codec_id),
+			context->codec->name,
 			av_get_sample_fmt_name(sample_fmt),
 			av_get_sample_fmt_name(context->sample_fmt));
 	context->sample_rate = FindBestSampleRate(context->codec, sample_rate);
 	if (context->sample_rate != sample_rate)
 		LOG->info(
 			"codec {} does not support sample rate {} so transcoding to {}",
-			avcodec_get_name(codec_id), sample_rate, context->sample_rate);
+			context->codec->name, sample_rate, context->sample_rate);
 	context->channel_layout = FindBestChannelLayout(context->codec, channel_layout);
 	if (context->channel_layout != channel_layout)
 		LOG->info(
 			"codec {} does not support channel layout {} so transcoding to {}",
-			avcodec_get_name(codec_id),
+			context->codec->name,
 			GetChannelLayoutString(channel_layout),
 			GetChannelLayoutString(context->channel_layout));
 	context->channels = av_get_channel_layout_nb_channels(context->channel_layout);

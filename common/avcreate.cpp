@@ -22,11 +22,16 @@ void AVFormatContextDeleter::operator()(AVFormatContext* context) const {
 	LOG_EXIT_METHOD;
 }
 
-AVCodecPtr CreateAVCodec(const AVCodecID& codec_id) {
+AVCodecPtr CreateAVCodec(const std::string& name, const AVCodecID& fallback) {
 	LOG_ENTER;
-	auto codec = avcodec_find_encoder(codec_id);
-	if (!codec)
-		throw std::invalid_argument(fmt::format("failed find codec with id {}", codec_id));
+	auto codec = avcodec_find_encoder_by_name(name.c_str());
+	if (!codec) {
+		LOG->warn("failed to find codec {}", name);
+		codec = avcodec_find_encoder(fallback);
+		if (!codec)
+			throw std::invalid_argument(fmt::format("failed find fallback codec with id {}", fallback));
+		LOG->warn("codec {} used as fallback", codec->name);
+	}
 	LOG_EXIT;
 	return codec;
 }

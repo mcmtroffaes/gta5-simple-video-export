@@ -34,8 +34,8 @@ AVFramePtr CreateVideoFrame(int width, int height, AVPixelFormat pix_fmt, uint8_
 	return frame;
 }
 
-VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCodecID codec_id, AVDictionaryPtr& options, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
-	: Stream{ format_context, codec_id }, pix_fmt{ pix_fmt }, dst_frame{ nullptr }
+VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, const AVCodec& codec, AVDictionaryPtr& options, int width, int height, const AVRational& frame_rate, AVPixelFormat pix_fmt)
+	: Stream{ format_context, codec }, pix_fmt{ pix_fmt }, dst_frame{ nullptr }
 {
 	LOG_ENTER_METHOD;
 	if (context->codec->type != AVMEDIA_TYPE_VIDEO)
@@ -53,7 +53,7 @@ VideoStream::VideoStream(std::shared_ptr<AVFormatContext>& format_context, AVCod
 	if (context->pix_fmt != pix_fmt) {
 		LOG->info(
 			"codec {} does not support pixel format {} so transcoding to {}",
-			avcodec_get_name(codec_id),
+			context->codec->name,
 			av_get_pix_fmt_name(pix_fmt),
 			av_get_pix_fmt_name(context->pix_fmt));
 	}
