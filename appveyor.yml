@@ -4,7 +4,7 @@ platform: x64
 configuration: Release
 environment:
   VCPKG_DEFAULT_TRIPLET: x64-windows-static-md
-  VCPKG_HASH: 99cfc38036f330a035b57aa67f661526153e31c7
+  VCPKG_HASH: 78a860ef7a79b3420d6a05074fcb8ae8304955d2
 install:
   # get all submodules
   - git submodule update --init --recursive
@@ -18,7 +18,6 @@ install:
   - call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
   # install dependencies
   - vcpkg integrate install
-  - vcpkg install yasm-tool:x86-windows
   - vcpkg install spdlog polyhook2[core,pe,virtuals] ffmpeg[core,avformat,avcodec,swresample,swscale,bzip2,iconv,lzma,nvcodec,mp3lame,opencl,opus,snappy,soxr,speex,theora,vorbis,vpx,zlib]
 build_script:
   - mkdir build
