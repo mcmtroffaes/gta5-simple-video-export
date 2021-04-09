@@ -16,6 +16,7 @@ struct AVFormatContextDeleter { void operator()(AVFormatContext* context) const;
 struct AVStreamDeleter { void operator()(AVStream* stream) const; };
 struct AVCodecContextDeleter { void operator()(AVCodecContext* context) const; };
 struct AVFrameDeleter { void operator()(AVFrame* frame) const; };
+struct AVPacketDeleter { void operator()(AVPacket* pkt) const; };
 struct SwrContextDeleter { void operator()(SwrContext* swr) const; };
 struct SwsContextDeleter { void operator()(SwsContext* sws) const; };
 struct AVAudioFifoDeleter { void operator()(AVAudioFifo* fifo) const; };
@@ -26,6 +27,7 @@ using AVCodecPtr = const AVCodec*;
 using AVStreamPtr = std::unique_ptr<AVStream, AVStreamDeleter>;
 using AVCodecContextPtr = std::unique_ptr<AVCodecContext, AVCodecContextDeleter>;
 using AVFramePtr = std::unique_ptr<AVFrame, AVFrameDeleter>;
+using AVPacketPtr = std::unique_ptr<AVPacket, AVPacketDeleter>;
 using SwrContextPtr = std::unique_ptr<SwrContext, SwrContextDeleter>;
 using SwsContextPtr = std::unique_ptr<SwsContext, SwsContextDeleter>;
 using AVAudioFifoPtr = std::unique_ptr<AVAudioFifo, AVAudioFifoDeleter>;
@@ -36,6 +38,7 @@ AVCodecPtr CreateAVCodec(const std::string& name, const AVCodecID& fallback);
 AVStreamPtr CreateAVStream(AVFormatContext& format_context, const AVCodec& codec);
 AVCodecContextPtr CreateAVCodecContext(const AVCodec& codec);
 AVFramePtr CreateAVFrame();
+AVPacketPtr CreateAVPacket();
 SwrContextPtr CreateSwrContext(
 	uint64_t out_channel_layout, AVSampleFormat out_sample_fmt, int out_sample_rate,
 	uint64_t in_channel_layout, AVSampleFormat in_sample_fmt, int in_sample_rate);

@@ -155,3 +155,20 @@ void AVDictionaryDeleter::operator()(AVDictionary* dict) const
 	av_dict_free(&dict);
 	LOG_EXIT_METHOD;
 }
+
+AVPacketPtr CreateAVPacket()
+{
+	LOG_ENTER;
+	auto pkt = av_packet_alloc();
+	if (!pkt)
+		throw std::runtime_error("failed to allocate packet");
+	LOG_EXIT;
+	return AVPacketPtr{ pkt };
+}
+
+void AVPacketDeleter::operator()(AVPacket* pkt) const
+{
+	LOG_ENTER_METHOD;
+	av_packet_free(&pkt);
+	LOG_EXIT_METHOD;
+}
