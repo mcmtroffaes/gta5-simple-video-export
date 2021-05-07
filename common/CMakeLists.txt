@@ -1,5 +1,5 @@
 find_package(spdlog CONFIG REQUIRED)
-find_package(ffmpeg REQUIRED)
+find_package(FFMPEG REQUIRED)
 find_package(PolyHook_2 CONFIG REQUIRED)
 add_library(common STATIC
   audiostream.cpp
