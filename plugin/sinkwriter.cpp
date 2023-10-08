@@ -48,16 +48,11 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 }
 
-// TODO reuse these VFunc typedefs
-/*
-typedef PLH::VFunc<4, decltype(&SinkWriterSetInputMediaType)> VSinkWriterSetInputMediaType;
-typedef PLH::VFunc<5, decltype(&SinkWriterBeginWriting)> VSinkWriterBeginWriting;
-typedef PLH::VFunc<6, decltype(&SinkWriterWriteSample)> VSinkWriterWriteSample;
-typedef PLH::VFunc<10, decltype(&SinkWriterFlush)> VSinkWriterFlush;
-typedef PLH::VFunc<11, decltype(&SinkWriterFinalize)> VSinkWriterFinalize;
-*/
-
-std::unique_ptr<PLH::VFuncMap> sinkwriter_orig_map = nullptr;
+typedef VFunc<4, decltype(&SinkWriterSetInputMediaType)> VSinkWriterSetInputMediaType;
+typedef VFunc<5, decltype(&SinkWriterBeginWriting)> VSinkWriterBeginWriting;
+typedef VFunc<6, decltype(&SinkWriterWriteSample)> VSinkWriterWriteSample;
+typedef VFunc<10, decltype(&SinkWriterFlush)> VSinkWriterFlush;
+typedef VFunc<11, decltype(&SinkWriterFinalize)> VSinkWriterFinalize;
 std::unique_ptr<IatHook<decltype(&CreateSinkWriterFromURL)>> create_sinkwriter_hook = nullptr;
 std::unique_ptr<VTableSwapHook> sinkwriter_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
@@ -69,7 +64,6 @@ void UnhookVFuncDetours()
 {
 	LOG_ENTER;
 	sinkwriter_hook = nullptr;
-	sinkwriter_orig_map = nullptr;  // IMPORTANT must be deallocated after sinkwriter_hook
 	audio_info = nullptr;
 	video_info = nullptr;
 	{
@@ -96,10 +90,9 @@ STDAPI SinkWriterSetInputMediaType(
 	LOG_ENTER;
 	auto hr = E_FAIL;
 	try {
-		if (!sinkwriter_orig_map)
+		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		uint64_t orig = (*sinkwriter_orig_map).at(4);
-		hr = ((decltype(&SinkWriterSetInputMediaType))orig)(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
+		hr = sinkwriter_hook->orig_func<VSinkWriterSetInputMediaType>(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
 		THROW_FAILED(hr);
 		GUID major_type = { 0 };
 		if (!pInputMediaType) {
@@ -127,10 +120,9 @@ STDAPI SinkWriterBeginWriting(
 	LOG_ENTER;
 	auto hr = E_FAIL;
 	try {
-		if (!sinkwriter_orig_map)
+		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		uint64_t orig = (*sinkwriter_orig_map).at(5);
-		hr = ((decltype(&SinkWriterBeginWriting))orig)(pThis);
+		hr = sinkwriter_hook->orig_func<VSinkWriterBeginWriting>(pThis);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -205,10 +197,9 @@ STDAPI SinkWriterWriteSample(
 	auto hr = E_FAIL;
 	try {
 		// call original function
-		if (!sinkwriter_orig_map)
+		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		uint64_t orig = (*sinkwriter_orig_map).at(6);
-		hr = ((decltype(&SinkWriterWriteSample))orig)(pThis, dwStreamIndex, pSample);
+		hr = sinkwriter_hook->orig_func<VSinkWriterWriteSample>(pThis, dwStreamIndex, pSample);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -232,10 +223,9 @@ STDAPI SinkWriterFlush(
 	LOG_CATCH;
 	auto hr = E_FAIL;
 	try {
-		if (!sinkwriter_orig_map)
+		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		uint64_t orig = (*sinkwriter_orig_map).at(10);
-		hr = ((decltype(&SinkWriterFlush))orig)(pThis, dwStreamIndex);
+		hr = sinkwriter_hook->orig_func<VSinkWriterFlush>(pThis, dwStreamIndex);
 		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 		UnhookVFuncDetours();
 		THROW_FAILED(hr);
@@ -258,10 +248,9 @@ STDAPI SinkWriterFinalize(
 			format->Flush();
 			format = nullptr;
 		}
-		if (!sinkwriter_orig_map)
+		if (!sinkwriter_hook)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		uint64_t orig = (*sinkwriter_orig_map).at(11);
-		hr = ((decltype(&SinkWriterFinalize))orig)(pThis);
+		hr = sinkwriter_hook->orig_func<VSinkWriterFinalize>(pThis);
 		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 		UnhookVFuncDetours();
 		THROW_FAILED(hr);
@@ -311,15 +300,14 @@ STDAPI CreateSinkWriterFromURL(
 			if (*ppSinkWriter == nullptr)
 				throw std::runtime_error("*ppSinkWriter is null");
 			PLH::VFuncMap redirect_map = {
-				{(uint16_t)4, (uint64_t)SinkWriterSetInputMediaType},
-				{(uint16_t)5, (uint64_t)SinkWriterBeginWriting},
-				{(uint16_t)6, (uint64_t)SinkWriterWriteSample},
-				{(uint16_t)10, (uint64_t)SinkWriterFlush},
-				{(uint16_t)11, (uint64_t)SinkWriterFinalize}
+				{VSinkWriterSetInputMediaType::func_index, (uint64_t)SinkWriterSetInputMediaType},
+				{VSinkWriterBeginWriting::func_index, (uint64_t)SinkWriterBeginWriting},
+				{VSinkWriterWriteSample::func_index, (uint64_t)SinkWriterWriteSample},
+				{VSinkWriterFlush::func_index, (uint64_t)SinkWriterFlush},
+				{VSinkWriterFinalize::func_index, (uint64_t)SinkWriterFinalize}
 			};
-			sinkwriter_orig_map = std::make_unique<PLH::VFuncMap>();
 			sinkwriter_hook = std::make_unique<VTableSwapHook>(
-				static_cast<IUnknown*>(*ppSinkWriter), redirect_map, *sinkwriter_orig_map
+				static_cast<IUnknown*>(*ppSinkWriter), redirect_map
 			);
 		}
 	}
