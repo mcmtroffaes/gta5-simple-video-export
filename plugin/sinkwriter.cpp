@@ -69,6 +69,7 @@ void UnhookVFuncDetours()
 {
 	LOG_ENTER;
 	sinkwriter_hook = nullptr;
+	sinkwriter_orig_map = nullptr;  // IMPORTANT must be deallocated after sinkwriter_hook
 	audio_info = nullptr;
 	video_info = nullptr;
 	{
@@ -262,7 +263,6 @@ STDAPI SinkWriterFinalize(
 		uint64_t orig = (*sinkwriter_orig_map).at(11);
 		hr = ((decltype(&SinkWriterFinalize))orig)(pThis);
 		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
-		sinkwriter_orig_map.reset();
 		UnhookVFuncDetours();
 		THROW_FAILED(hr);
 		LOG->info("export finished");
@@ -333,7 +333,6 @@ void Hook()
 	LOG_ENTER;
 	try {
 		UnhookVFuncDetours(); // virtual functions are hooked by CreateSinkWriterFromURL
-		sinkwriter_orig_map.reset();
 		create_sinkwriter_hook.reset(new IatHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL));
 	}
 	LOG_CATCH;
