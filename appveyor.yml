@@ -29,7 +29,7 @@ after_build:
   - ps: Copy-Item -Path "..\test\*.ini" -Destination .
   - dir /b *.asi *.exe *.ini
   - 7z a ..\SimpleVideoExport-git-%APPVEYOR_BUILD_VERSION%.7z *.asi *.exe *.ini
-test: off
+test: false
 artifacts:
   - path: SimpleVideoExport-git-$(APPVEYOR_BUILD_VERSION).7z
 cache: c:\tools\vcpkg\installed\ -> appveyor.yml

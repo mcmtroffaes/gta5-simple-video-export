@@ -9,7 +9,8 @@ add_library(common STATIC
   settings.cpp
   stream.cpp
   videostream.cpp)
-target_link_libraries(common PUBLIC ${FFMPEG_LIBRARIES})
 target_include_directories(common PUBLIC ${FFMPEG_INCLUDE_DIRS})
+target_link_directories(common PUBLIC ${FFMPEG_LIBRARY_DIRS})
+target_link_libraries(common PUBLIC ${FFMPEG_LIBRARIES})
 target_link_libraries(common PUBLIC PolyHook_2::PolyHook_2)
 target_link_libraries(common PUBLIC spdlog::spdlog)

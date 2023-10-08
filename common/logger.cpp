@@ -4,6 +4,7 @@
 #include <string>
 
 extern "C" {
+#include <libavutil/error.h>
 #include <libavutil/log.h>
 }
 
