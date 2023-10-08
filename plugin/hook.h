@@ -34,33 +34,15 @@ private:
 	FuncPtr orig_func;
 };
 
-template<typename ... VFuncTypes>
 class VTableSwapHook : private PLH::VTableSwapHook {
 public:
-	VTableSwapHook(IUnknown* instance, VFuncTypes ... new_funcs)
-		: PLH::VTableSwapHook(reinterpret_cast<uint64_t>(instance), new_funcs ...)
+	VTableSwapHook(IUnknown* instance, const PLH::VFuncMap& redirectMap, PLH::VFuncMap& origVFuncs)
+		: PLH::VTableSwapHook(reinterpret_cast<uint64_t>(instance), redirectMap, &origVFuncs)
 		, m_com_ptr(instance)
-		, m_shared_ptr(nullptr)
 	{
 		m_com_ptr->AddRef();
 		if (!hook())
 			throw std::runtime_error("vtable swap hook failed");
-	};
-
-	template <typename T>
-	VTableSwapHook(std::shared_ptr<T> instance, VFuncTypes ... new_funcs)
-		: PLH::VTableSwapHook(reinterpret_cast<uint64_t>(instance.get()), new_funcs ...)
-		, m_com_ptr(nullptr)
-		, m_shared_ptr(instance)
-	{
-		if (!hook())
-			throw std::runtime_error("vtable swap hook failed");
-	};
-
-	template<typename VFuncType, typename ... Args>
-	inline auto origFunc(Args && ... args) {
-		static_assert(std::disjunction_v<std::is_same<VFuncType, VFuncTypes> ...>); 
-		return PLH::VTableSwapHook::origFunc<VFuncType>(std::forward<Args>(args) ...);
 	};
 
 	virtual ~VTableSwapHook()
@@ -73,6 +55,4 @@ public:
 private:
 	// com object pointer to get and release ownership
 	IUnknown* m_com_ptr;
-	// shared pointer to maintain ownership
-	std::shared_ptr<void> m_shared_ptr;
 };

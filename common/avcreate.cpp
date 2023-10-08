@@ -29,7 +29,7 @@ AVCodecPtr CreateAVCodec(const std::string& name, const AVCodecID& fallback) {
 		LOG->warn("failed to find codec {}", name);
 		codec = avcodec_find_encoder(fallback);
 		if (!codec)
-			throw std::invalid_argument(fmt::format("failed find fallback codec with id {}", fallback));
+			throw std::invalid_argument(fmt::format("failed find fallback codec with id {}", (int)fallback));
 		LOG->warn("codec {} used as fallback", codec->name);
 	}
 	LOG_EXIT;

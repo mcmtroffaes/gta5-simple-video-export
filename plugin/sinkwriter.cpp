@@ -48,20 +48,18 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 }
 
+// TODO reuse these VFunc typedefs
+/*
 typedef PLH::VFunc<4, decltype(&SinkWriterSetInputMediaType)> VSinkWriterSetInputMediaType;
 typedef PLH::VFunc<5, decltype(&SinkWriterBeginWriting)> VSinkWriterBeginWriting;
 typedef PLH::VFunc<6, decltype(&SinkWriterWriteSample)> VSinkWriterWriteSample;
 typedef PLH::VFunc<10, decltype(&SinkWriterFlush)> VSinkWriterFlush;
 typedef PLH::VFunc<11, decltype(&SinkWriterFinalize)> VSinkWriterFinalize;
-typedef VTableSwapHook<
-	VSinkWriterSetInputMediaType,
-	VSinkWriterBeginWriting,
-	VSinkWriterWriteSample,
-	VSinkWriterFlush,
-	VSinkWriterFinalize> VTableSinkWriter;
+*/
 
+std::unique_ptr<PLH::VFuncMap> sinkwriter_orig_map = nullptr;
 std::unique_ptr<IatHook<decltype(&CreateSinkWriterFromURL)>> create_sinkwriter_hook = nullptr;
-std::unique_ptr<VTableSinkWriter> sinkwriter_hook = nullptr;
+std::unique_ptr<VTableSwapHook> sinkwriter_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
 std::unique_ptr<Format> format = nullptr;
@@ -97,9 +95,10 @@ STDAPI SinkWriterSetInputMediaType(
 	LOG_ENTER;
 	auto hr = E_FAIL;
 	try {
-		if (!sinkwriter_hook)
+		if (!sinkwriter_orig_map)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<VSinkWriterSetInputMediaType>(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
+		uint64_t orig = (*sinkwriter_orig_map).at(4);
+		hr = ((decltype(&SinkWriterSetInputMediaType))orig)(pThis, dwStreamIndex, pInputMediaType, pEncodingParameters);
 		THROW_FAILED(hr);
 		GUID major_type = { 0 };
 		if (!pInputMediaType) {
@@ -127,9 +126,10 @@ STDAPI SinkWriterBeginWriting(
 	LOG_ENTER;
 	auto hr = E_FAIL;
 	try {
-		if (!sinkwriter_hook)
+		if (!sinkwriter_orig_map)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<VSinkWriterBeginWriting>(pThis);
+		uint64_t orig = (*sinkwriter_orig_map).at(5);
+		hr = ((decltype(&SinkWriterBeginWriting))orig)(pThis);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -204,9 +204,10 @@ STDAPI SinkWriterWriteSample(
 	auto hr = E_FAIL;
 	try {
 		// call original function
-		if (!sinkwriter_hook)
+		if (!sinkwriter_orig_map)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<VSinkWriterWriteSample>(pThis, dwStreamIndex, pSample);
+		uint64_t orig = (*sinkwriter_orig_map).at(6);
+		hr = ((decltype(&SinkWriterWriteSample))orig)(pThis, dwStreamIndex, pSample);
 		THROW_FAILED(hr);
 	}
 	LOG_CATCH;
@@ -230,9 +231,10 @@ STDAPI SinkWriterFlush(
 	LOG_CATCH;
 	auto hr = E_FAIL;
 	try {
-		if (!sinkwriter_hook)
+		if (!sinkwriter_orig_map)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<VSinkWriterFlush>(pThis, dwStreamIndex);
+		uint64_t orig = (*sinkwriter_orig_map).at(10);
+		hr = ((decltype(&SinkWriterFlush))orig)(pThis, dwStreamIndex);
 		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
 		UnhookVFuncDetours();
 		THROW_FAILED(hr);
@@ -255,10 +257,12 @@ STDAPI SinkWriterFinalize(
 			format->Flush();
 			format = nullptr;
 		}
-		if (!sinkwriter_hook)
+		if (!sinkwriter_orig_map)
 			throw std::runtime_error("IMFSinkWriter hook not set up");
-		hr = sinkwriter_hook->origFunc<VSinkWriterFinalize>(pThis);
+		uint64_t orig = (*sinkwriter_orig_map).at(11);
+		hr = ((decltype(&SinkWriterFinalize))orig)(pThis);
 		/* we should no longer use this IMFSinkWriter instance, so clean up all virtual function hooks */
+		sinkwriter_orig_map.reset();
 		UnhookVFuncDetours();
 		THROW_FAILED(hr);
 		LOG->info("export finished");
@@ -306,14 +310,17 @@ STDAPI CreateSinkWriterFromURL(
 				throw std::runtime_error("ppSinkWriter is null");
 			if (*ppSinkWriter == nullptr)
 				throw std::runtime_error("*ppSinkWriter is null");
-			sinkwriter_hook = std::make_unique<VTableSinkWriter>(
-				static_cast<IUnknown*>(*ppSinkWriter),
-				VSinkWriterSetInputMediaType(&SinkWriterSetInputMediaType),
-				VSinkWriterBeginWriting(&SinkWriterBeginWriting),
-				VSinkWriterWriteSample(&SinkWriterWriteSample),
-				VSinkWriterFlush(&SinkWriterFlush),
-				VSinkWriterFinalize(&SinkWriterFinalize)
-				);
+			PLH::VFuncMap redirect_map = {
+				{(uint16_t)4, (uint64_t)SinkWriterSetInputMediaType},
+				{(uint16_t)5, (uint64_t)SinkWriterBeginWriting},
+				{(uint16_t)6, (uint64_t)SinkWriterWriteSample},
+				{(uint16_t)10, (uint64_t)SinkWriterFlush},
+				{(uint16_t)11, (uint64_t)SinkWriterFinalize}
+			};
+			sinkwriter_orig_map = std::make_unique<PLH::VFuncMap>();
+			sinkwriter_hook = std::make_unique<VTableSwapHook>(
+				static_cast<IUnknown*>(*ppSinkWriter), redirect_map, *sinkwriter_orig_map
+			);
 		}
 	}
 	LOG_CATCH;
@@ -326,6 +333,7 @@ void Hook()
 	LOG_ENTER;
 	try {
 		UnhookVFuncDetours(); // virtual functions are hooked by CreateSinkWriterFromURL
+		sinkwriter_orig_map.reset();
 		create_sinkwriter_hook.reset(new IatHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL));
 	}
 	LOG_CATCH;
