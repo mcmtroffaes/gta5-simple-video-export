@@ -48,6 +48,19 @@ struct VFunc {
 // definition of constant must reside outside class declaration
 template<uint16_t I, typename FuncPtr> const uint16_t VFunc<I, FuncPtr>::func_index = I;
 
+PLH::VFuncMap make_redirect_map()
+{
+	return PLH::VFuncMap();
+};
+
+template<uint16_t I, typename FuncPtr, typename ... VFuncTypes>
+PLH::VFuncMap make_redirect_map(VFunc<I, FuncPtr> vfunc, VFuncTypes ... vfuncs)
+{
+	auto map{ make_redirect_map(vfuncs ...) };
+	map[I] = reinterpret_cast<uint64_t>(vfunc.func);
+	return map;
+};
+
 class VTableSwapHook {
 public:
 	VTableSwapHook(IUnknown* instance, const PLH::VFuncMap& redirect_map)

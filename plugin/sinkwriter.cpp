@@ -299,13 +299,13 @@ STDAPI CreateSinkWriterFromURL(
 				throw std::runtime_error("ppSinkWriter is null");
 			if (*ppSinkWriter == nullptr)
 				throw std::runtime_error("*ppSinkWriter is null");
-			PLH::VFuncMap redirect_map = {
-				{VSinkWriterSetInputMediaType::func_index, (uint64_t)SinkWriterSetInputMediaType},
-				{VSinkWriterBeginWriting::func_index, (uint64_t)SinkWriterBeginWriting},
-				{VSinkWriterWriteSample::func_index, (uint64_t)SinkWriterWriteSample},
-				{VSinkWriterFlush::func_index, (uint64_t)SinkWriterFlush},
-				{VSinkWriterFinalize::func_index, (uint64_t)SinkWriterFinalize}
-			};
+			PLH::VFuncMap redirect_map = make_redirect_map(
+				VSinkWriterSetInputMediaType(&SinkWriterSetInputMediaType),
+				VSinkWriterBeginWriting(&SinkWriterBeginWriting),
+				VSinkWriterWriteSample(&SinkWriterWriteSample),
+				VSinkWriterFlush(&SinkWriterFlush),
+				VSinkWriterFinalize(&SinkWriterFinalize)
+			);
 			sinkwriter_hook = std::make_unique<VTableSwapHook>(
 				static_cast<IUnknown*>(*ppSinkWriter), redirect_map
 			);
