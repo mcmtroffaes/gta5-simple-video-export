@@ -64,11 +64,9 @@ PLH::VFuncMap make_redirect_map(VFunc<I, FuncPtr> vfunc, VFuncTypes ... vfuncs)
 class VTableSwapHook {
 public:
 	VTableSwapHook(IUnknown* instance, const PLH::VFuncMap& redirect_map)
-		: m_com_ptr(instance)
-		, m_orig_map()
+		: m_orig_map()
 		, m_table(reinterpret_cast<uint64_t>(instance), redirect_map, &m_orig_map)
 	{
-		m_com_ptr->AddRef();
 		if (!m_table.hook())
 			throw std::runtime_error("vtable swap hook failed");
 	};
@@ -82,13 +80,9 @@ public:
 	virtual ~VTableSwapHook()
 	{
 		m_table.unHook();
-		if (m_com_ptr)
-			m_com_ptr->Release();
 	}
 
 private:
 	PLH::VFuncMap m_orig_map;
 	PLH::VTableSwapHook m_table;
-	// com object pointer to get and release ownership
-	IUnknown* m_com_ptr;
 };
