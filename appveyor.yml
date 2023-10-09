@@ -19,6 +19,14 @@ install:
   # install dependencies (note: polyhook2 needs asmjit and asmtk explicitly listed)
   - vcpkg integrate install
   - vcpkg install spdlog asmjit asmtk polyhook2[core,pe,virtuals] ffmpeg[core,avformat,avcodec,swresample,swscale,nvcodec,mp3lame,opencl,openjpeg,opus,snappy,soxr,speex,theora,vorbis,vpx,webp,zlib]
+  - ps: |
+      if (Test-Path "sdk\sdk.zip" -PathType leaf)
+      {
+        cd sdk
+        Invoke-WebRequest -Uri "http://www.dev-c.com/files/ScriptHookV_SDK_1.0.617.1a.zip" -OutFile "sdk.zip" -Headers @{ "Referer" = "http://www.dev-c.com/gtav/scripthookv/" }
+        7z x sdk.zip
+        cd ..
+      }
 build: off
 build_script:
   - mkdir build
@@ -33,4 +41,6 @@ after_build:
 test: off
 artifacts:
   - path: SimpleVideoExport-git-$(APPVEYOR_BUILD_VERSION).7z
-cache: c:\tools\vcpkg\installed\ -> appveyor.yml
+cache:
+  - c:\tools\vcpkg\installed\ -> appveyor.yml
+  - sdk\sdk.zip -> appveyor.yml

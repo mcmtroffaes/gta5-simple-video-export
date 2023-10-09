@@ -44,6 +44,12 @@ all the SinkWriter hooks.
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
 
+#include <d3d11.h>
+#pragma comment(lib, "d3d11.lib")
+
+#include "../sdk/inc/main.h"
+#pragma comment(lib, "ScriptHookV.lib")
+
 extern "C" {
 #include <libavutil/pixdesc.h>
 }
@@ -55,6 +61,8 @@ typedef VFunc<10, decltype(&SinkWriterFlush)> VSinkWriterFlush;
 typedef VFunc<11, decltype(&SinkWriterFinalize)> VSinkWriterFinalize;
 std::unique_ptr<IatHook<decltype(&CreateSinkWriterFromURL)>> create_sinkwriter_hook = nullptr;
 std::unique_ptr<VTableSwapHook> sinkwriter_hook = nullptr;
+typedef VFunc<33, decltype(&DeviceContextOMSetRenderTargets)> VDeviceContextOMSetRenderTargets;
+std::unique_ptr<VTableSwapHook> devicecontext_hook = nullptr;
 std::unique_ptr<AudioInfo> audio_info = nullptr;
 std::unique_ptr<VideoInfo> video_info = nullptr;
 std::unique_ptr<Format> format = nullptr;
@@ -70,14 +78,6 @@ void UnhookVFuncDetours()
 		std::lock_guard<std::mutex> lock(format_mutex);
 		format = nullptr;
 	}
-	LOG_EXIT;
-}
-
-void Unhook()
-{
-	LOG_ENTER;
-	UnhookVFuncDetours();
-	create_sinkwriter_hook = nullptr;
 	LOG_EXIT;
 }
 
@@ -314,13 +314,65 @@ STDAPI CreateSinkWriterFromURL(
 	return hr;
 }
 
+void STDMETHODCALLTYPE DeviceContextOMSetRenderTargets(
+	ID3D11DeviceContext* pThis,
+	UINT NumViews,
+	ID3D11RenderTargetView* const* ppRenderTargetViews,
+	ID3D11DepthStencilView* pDepthStencilView)
+{
+	LOG_ENTER;
+	try {
+		LOG->trace("setting render target");
+		LOG->trace("  device context: {}", (uint64_t)pThis);
+		for (size_t i = 0; i < NumViews; i++) {
+			LOG->trace("  render target view {}: {}", i, (uint64_t)ppRenderTargetViews[i]);
+		}
+		LOG->trace("  depth stencil view: {}", (uint64_t)pDepthStencilView);
+	}
+	LOG_CATCH;
+	try {
+		if (!devicecontext_hook)
+			throw std::runtime_error("ID3D11DeviceContext hook not set up");
+		devicecontext_hook->orig_func<VDeviceContextOMSetRenderTargets>(pThis, NumViews, ppRenderTargetViews, pDepthStencilView);
+	}
+	LOG_CATCH;
+	LOG_EXIT;
+}
+
+void onPresent(IDXGISwapChain* pSwapChain) {
+	if (!devicecontext_hook) {
+		LOG_ENTER;
+		const PLH::VFuncMap redirect_map = make_redirect_map(
+			VDeviceContextOMSetRenderTargets(&DeviceContextOMSetRenderTargets)
+		);
+		ID3D11Device* pDevice = nullptr;
+		ID3D11DeviceContext* pDeviceContext = nullptr;
+		pSwapChain->GetDevice(__uuidof(ID3D11Device), (void**)&pDevice);
+		pDevice->GetImmediateContext(&pDeviceContext);
+		assert(pDeviceContext);
+		devicecontext_hook = std::make_unique<VTableSwapHook>(pDeviceContext, redirect_map);
+		LOG_EXIT;
+	}
+}
+
 void Hook()
 {
 	LOG_ENTER;
 	try {
 		UnhookVFuncDetours(); // virtual functions are hooked by CreateSinkWriterFromURL
 		create_sinkwriter_hook.reset(new IatHook("mfreadwrite.dll", "MFCreateSinkWriterFromURL", &CreateSinkWriterFromURL));
+		presentCallbackRegister((void(*)(void*))onPresent);
 	}
 	LOG_CATCH;
+	LOG_EXIT;
+}
+
+void Unhook()
+{
+	LOG_ENTER;
+	UnhookVFuncDetours();
+	presentCallbackUnregister((void(*)(void*))onPresent);
+	create_sinkwriter_hook = nullptr;
+	devicecontext_hook = nullptr;
 	LOG_EXIT;
 }
