@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unknwn.h>
-#include <wrl/client.h>
 #include <polyhook2/PE/IatHook.hpp>
 #include <polyhook2/Virtuals/VTableSwapHook.hpp>
 
@@ -63,9 +61,9 @@ PLH::VFuncMap make_redirect_map(VFunc<I, FuncPtr> vfunc, VFuncTypes ... vfuncs)
 
 class VTableSwapHook {
 public:
-	VTableSwapHook(IUnknown* instance, const PLH::VFuncMap& redirect_map)
+	VTableSwapHook(void* pInstance, const PLH::VFuncMap& redirect_map)
 		: m_orig_map()
-		, m_table(reinterpret_cast<uint64_t>(instance), redirect_map, &m_orig_map)
+		, m_table(reinterpret_cast<uint64_t>(pInstance), redirect_map, &m_orig_map)
 	{
 		if (!m_table.hook())
 			throw std::runtime_error("vtable swap hook failed");
