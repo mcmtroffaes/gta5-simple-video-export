@@ -18,4 +18,3 @@ add_library(SimpleVideoExport SHARED
   plugin/sinkwriter.cpp)
 set_target_properties(SimpleVideoExport PROPERTIES SUFFIX ".asi")
 target_link_libraries(SimpleVideoExport PRIVATE common)
-target_link_directories(SimpleVideoExport PRIVATE ${CMAKE_SOURCE_DIR}/sdk/lib)
