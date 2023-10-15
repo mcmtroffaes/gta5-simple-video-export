@@ -4,14 +4,14 @@ platform: x64
 configuration: Release
 environment:
   VCPKG_DEFAULT_TRIPLET: x64-windows-static-md
-  VCPKG_HASH: cc97b4536ae749ec0e4f643488b600b217540fb3
+  VCPKG_HASH: 486a4640db740f5994e492eb60748111dfc48de7
 install:
   # get all submodules
   - git submodule update --init --recursive
   # checkout specific vcpkg commit
-  #- pushd C:\Tools\vcpkg && git log -1 && popd
-  #- pushd C:\Tools\vcpkg && git fetch && git checkout %VCPKG_HASH% && git log -1 && popd
-  #- pushd C:\Tools\vcpkg && .\bootstrap-vcpkg.bat -disableMetrics && popd
+  - pushd C:\Tools\vcpkg && git log -1 && popd
+  - pushd C:\Tools\vcpkg && git fetch && git checkout %VCPKG_HASH% && git log -1 && popd
+  - pushd C:\Tools\vcpkg && .\bootstrap-vcpkg.bat -disableMetrics && popd
   # force release build type (disables debug builds)
   - echo.set(VCPKG_BUILD_TYPE release)>> C:\Tools\vcpkg\triplets\community\x64-windows-static-md.cmake
   # set up visual studio prompt
