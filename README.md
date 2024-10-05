@@ -28,7 +28,7 @@ then you already have it (it is the ``dinput8.dll`` file).
 
 Once you have an asi loader,
 just put the ``SimpleVideoExport.asi`` and ``SimpleVideoExport.ini`` files into the root of your game folder
-(or whichever folder that you have configered for your asi loader),
+(or whichever folder that you have configured for your asi loader),
 and you are good to go.
 
 Optionally, you may put
@@ -42,7 +42,7 @@ without having to start the game.
 Configuration
 -------------
 
-All settings can be configered from ``SimpleVideoExport.ini``.
+All settings can be configured from ``SimpleVideoExport.ini``.
 The settings are documented and should be self-explanatory.
 
 By default, the plugin will export lossless
